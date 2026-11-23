@@ -1,0 +1,7 @@
+{
+  "id": "echo",
+  "name": "Echo",
+  "version": "1.0.0",
+  "runtime": "node",
+  "entry": "server.js"
+}

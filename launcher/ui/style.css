@@ -1,0 +1,27 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  --line: color-mix(in srgb, currentColor 15%, transparent);
+  --accent: #6d5dfc;
+}
+body { margin: 0; display: flex; flex-direction: column; min-height: 100vh; }
+header, footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 20px; }
+header { border-bottom: 1px solid var(--line); }
+footer { border-top: 1px solid var(--line); font-size: 0.85rem; flex-wrap: wrap; }
+h1 { font-size: 1.1rem; margin: 0; }
+main { flex: 1; padding: 20px; }
+.session { opacity: 0.7; }
+.services { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.card { display: flex; justify-content: space-between; gap: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
+.card h2 { font-size: 1rem; margin: 0 0 4px; }
+.card p { margin: 2px 0; }
+.info { min-width: 0; }
+.actions { display: flex; gap: 8px; align-items: flex-start; flex-shrink: 0; }
+.muted { opacity: 0.65; }
+.small { font-size: 0.8rem; word-break: break-all; }
+.error { color: #e5484d; white-space: pre-wrap; }
+button { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+button:disabled { opacity: 0.5; cursor: default; }
+nav { display: flex; gap: 6px; }
+code { font-family: ui-monospace, monospace; }

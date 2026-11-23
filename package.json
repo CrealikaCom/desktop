@@ -1,0 +1,18 @@
+{
+  "name": "crealika-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Crealika Desktop: launcher for local Crealika services",
+  "type": "module",
+  "main": "launcher/main.js",
+  "scripts": {
+    "start": "node scripts/run-electron.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "devDependencies": {
+    "electron": "44.5.0"
+  }
+}
