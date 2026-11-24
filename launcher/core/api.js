@@ -1,10 +1,12 @@
 // Local API of the service host process.
 // Listens on 127.0.0.1 only. Two kinds of tokens:
-// - service token: the service backend asks for the session and paths (/v1/...);
+// - service token: the service backend asks for the session, an access token and paths (/v1/...);
 // - control token: the launcher pings, focuses and stops the service (/control/...).
 import http from 'node:http';
 
-export function createLauncherApi({ getSession, getPaths, controlToken = null, onControl = null }) {
+const TOKEN_ERRORS = { signed_out: 401, expired: 401, unavailable: 503 };
+
+export function createLauncherApi({ getSession, getPaths, getToken = null, controlToken = null, onControl = null }) {
   const tokens = new Map(); // token -> service id
   let server = null;
   let url = null;
@@ -29,6 +31,16 @@ export function createLauncherApi({ getSession, getPaths, controlToken = null, o
     if (req.method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });
     if (pathname === '/v1/session') return send(res, 200, await getSession(serviceId));
     if (pathname === '/v1/paths') return send(res, 200, await getPaths(serviceId));
+    if (pathname === '/v1/token') {
+      if (!getToken) return send(res, 401, { error: 'signed_out' });
+      try {
+        return send(res, 200, await getToken(serviceId));
+      } catch (err) {
+        const status = TOKEN_ERRORS[err.code];
+        if (!status) throw err;
+        return send(res, status, { error: err.code, message: err.message });
+      }
+    }
     return send(res, 404, { error: 'not_found' });
   }
 

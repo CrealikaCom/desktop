@@ -4,9 +4,11 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { createAppSession } from './app-session.js';
 import { loadCatalogs } from './core/catalog.js';
 import { ensureHome, resolveHome } from './core/home.js';
 import { install, listInstalled, uninstall } from './core/installer.js';
+import { SignInError, signInWithBrowser } from './core/crealika-id.js';
 import { control, listRunning, readRun } from './core/registry.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -19,7 +21,10 @@ export function runLauncher() {
     return;
   }
 
-  let lay, mainWindow;
+  let lay, mainWindow, auth;
+  // One browser sign-in at a time: { url, abort } while waiting for the browser.
+  let signIn = null;
+  let signInError = null;
   const busy = new Set(); // ids of services being installed, removed or started
 
   const catalogFiles = () => [path.join(appRoot, 'catalog.json'), path.join(lay.config, 'catalog.json')];
@@ -31,7 +36,10 @@ export function runLauncher() {
     const ids = new Set([...catalog.map((c) => c.id), ...installed.keys()]);
     return {
       home: lay.home,
-      session: { mode: 'guest', user: null },
+      session: await auth.session.state(),
+      signIn: signIn ? { url: signIn.url } : null,
+      signInError,
+      weakStorage: auth.weakStorage(),
       services: [...ids].sort().map((id) => {
         const c = catalog.find((x) => x.id === id);
         const m = installed.get(id);
@@ -101,6 +109,42 @@ export function runLauncher() {
     });
   }
 
+  // Opens the system browser; CREALIKA_DESKTOP_NO_BROWSER keeps it closed (headless checks),
+  // the window then shows the sign-in link.
+  async function openBrowser(url) {
+    if (!process.env.CREALIKA_DESKTOP_NO_BROWSER) await shell.openExternal(url);
+  }
+
+  function startSignIn() {
+    if (signIn) return;
+    const abort = new AbortController();
+    signIn = { url: null, abort };
+    signInError = null;
+    notify();
+    const idp = auth.idp();
+    signInWithBrowser({
+      idp,
+      openBrowser,
+      signal: abort.signal,
+      onUrl: (url) => {
+        signIn.url = url;
+        notify();
+      },
+    })
+      .then(({ tokens, user }) => auth.session.signIn({ issuer: idp.issuer, user, tokens }))
+      .catch((err) => {
+        if (!(err instanceof SignInError && err.code === 'cancelled')) {
+          signInError = err instanceof SignInError && err.code === 'denied'
+            ? 'Sign-in was cancelled in the browser.'
+            : `Sign-in failed: ${err.message ?? err}`;
+        }
+      })
+      .finally(() => {
+        signIn = null;
+        notify();
+      });
+  }
+
   function handle(channel, fn) {
     ipcMain.handle(channel, async (_e, ...args) => {
       try {
@@ -119,6 +163,7 @@ export function runLauncher() {
 
   async function main() {
     lay = await ensureHome(resolveHome());
+    auth = createAppSession(lay);
 
     handle('state', state);
     handle('install', async (id) => {
@@ -136,6 +181,14 @@ export function runLauncher() {
       }),
     );
     handle('open', openService);
+    handle('sign-in', startSignIn);
+    handle('sign-in-cancel', () => signIn?.abort.abort());
+    handle('sign-in-reopen', () => signIn?.url && shell.openExternal(signIn.url));
+    handle('sign-out', async () => {
+      signInError = null;
+      await auth.session.signOut();
+      notify();
+    });
     handle('stop', stopService);
     handle('open-folder', (kind) => {
       if (!['home', 'models', 'output', 'logs', 'config', 'services'].includes(kind)) throw new Error('unknown folder');

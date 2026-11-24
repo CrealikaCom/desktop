@@ -52,10 +52,50 @@ function serviceCard(s) {
   ]);
 }
 
+function renderAccount(st) {
+  const user = st.session.user;
+  const parts = [];
+  if (st.signIn) {
+    parts.push(el('span', { className: 'muted', textContent: 'Signing in…' }));
+    parts.push(button('Cancel', () => api.cancelSignIn()));
+  } else if (user) {
+    parts.push(el('span', { textContent: `@${user.username ?? user.sub}` }));
+    parts.push(button('Sign out', () => api.signOut()));
+  } else {
+    parts.push(el('span', { className: 'muted', textContent: 'Guest' }));
+    parts.push(button('Sign in', () => api.signIn(), { primary: true }));
+  }
+  $('account').replaceChildren(...parts);
+
+  const notes = [];
+  if (st.signIn) {
+    notes.push(el('p', { textContent: 'Finish signing in with Crealika ID in your browser.' }));
+    if (st.signIn.url) {
+      notes.push(el('p', {}, [button('Open the sign-in page again', () => api.reopenSignIn())]));
+      const link = el('details', {}, [
+        el('summary', { className: 'muted small', textContent: 'Show link' }),
+        el('p', { className: 'muted small', textContent: st.signIn.url }),
+      ]);
+      // Re-rendering every few seconds must not fold the link back up.
+      link.open = Boolean(document.querySelector('#notice details')?.open);
+      notes.push(link);
+    }
+  }
+  if (st.signInError) notes.push(el('p', { className: 'error', textContent: st.signInError }));
+  if (user && st.weakStorage) {
+    notes.push(el('p', {
+      className: 'muted',
+      textContent: 'No system keyring was found, so the sign-in is stored without strong encryption.',
+    }));
+  }
+  $('notice').hidden = !notes.length;
+  $('notice').replaceChildren(...notes);
+}
+
 async function render() {
   const st = await api.state();
   $('home').textContent = st.home;
-  $('session').textContent = st.session.user ? st.session.user.name : 'Guest';
+  renderAccount(st);
   $('services').replaceChildren(
     ...(st.services.length
       ? st.services.map(serviceCard)

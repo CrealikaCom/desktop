@@ -5,6 +5,7 @@
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { app, BrowserWindow, dialog, shell } from 'electron';
+import { createAppSession } from './app-session.js';
 import { createLauncherApi } from './core/api.js';
 import { ensureHome, resolveHome } from './core/home.js';
 import { readManifest } from './core/manifest.js';
@@ -23,8 +24,6 @@ export function runServiceHost(id) {
 
   let lay, api, runner, win;
   let quitting = false;
-  // No sign-in yet: every service runs as a guest.
-  const session = { mode: 'guest', user: null };
 
   const focus = () => {
     if (!win || win.isDestroyed()) return;
@@ -53,8 +52,11 @@ export function runServiceHost(id) {
     lay = await ensureHome(resolveHome());
     const manifest = await readManifest(path.join(lay.services, id));
     const controlToken = randomBytes(32).toString('base64url');
+    // The launcher signs in; every host reads the same shared session.
+    const { session } = createAppSession(lay);
     api = createLauncherApi({
-      getSession: async () => session,
+      getSession: () => session.state(),
+      getToken: () => session.accessToken(),
       getPaths: async (sid) => ({
         home: lay.home,
         models: lay.models,

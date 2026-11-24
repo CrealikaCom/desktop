@@ -14,5 +14,8 @@
   },
   "devDependencies": {
     "electron": "44.5.0"
+  },
+  "dependencies": {
+    "openid-client": "6.9.1"
   }
 }
