@@ -18,7 +18,23 @@ export function resolveIssuer(env = process.env) {
   return (env.CREALIKA_ID_ISSUER || DEFAULT_ISSUER).replace(/\/+$/, '');
 }
 
-export function createCrealikaId({ issuer, clientId = CLIENT_ID }) {
+// Crealika services whose APIs accept a user access token issued for them (RFC 8707):
+// resource indicator -> scope. CREALIKA_ID_RESOURCES overrides it, e.g. for a local setup:
+// "http://localhost:4200=media".
+const KNOWN_RESOURCES = { [DEFAULT_ISSUER]: { 'https://media.crealika.com': 'media' } };
+
+export function resolveResources(issuer, env = process.env) {
+  if (env.CREALIKA_ID_RESOURCES === undefined) return { ...(KNOWN_RESOURCES[issuer] ?? {}) };
+  const out = {};
+  for (const item of env.CREALIKA_ID_RESOURCES.split(',').map((s) => s.trim()).filter(Boolean)) {
+    const i = item.lastIndexOf('=');
+    if (i <= 0) throw new Error(`CREALIKA_ID_RESOURCES: expected resource=scope, got ${item}`);
+    out[item.slice(0, i)] = item.slice(i + 1);
+  }
+  return out;
+}
+
+export function createCrealikaId({ issuer, clientId = CLIENT_ID, resources = {} }) {
   const url = new URL(issuer);
   const insecure = url.protocol === 'http:';
   if (insecure && !LOOPBACK.has(url.hostname)) throw new Error(`Crealika ID issuer must use https: ${issuer}`);
@@ -35,20 +51,23 @@ export function createCrealikaId({ issuer, clientId = CLIENT_ID }) {
 
   return {
     issuer,
+    resources: Object.keys(resources),
 
     async authorizationRequest(redirectUri) {
       const verifier = oidc.randomPKCECodeVerifier();
       const state = oidc.randomState();
       const nonce = oidc.randomNonce();
-      const target = oidc.buildAuthorizationUrl(await config(), {
+      const params = new URLSearchParams({
         redirect_uri: redirectUri,
-        scope: 'openid profile offline_access',
+        scope: ['openid profile offline_access', ...new Set(Object.values(resources))].join(' '),
         prompt: 'consent',
         code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
         code_challenge_method: 'S256',
         state,
         nonce,
       });
+      for (const resource of Object.keys(resources)) params.append('resource', resource);
+      const target = oidc.buildAuthorizationUrl(await config(), params);
       return { url: target.href, verifier, state, nonce };
     },
 
@@ -71,8 +90,9 @@ export function createCrealikaId({ issuer, clientId = CLIENT_ID }) {
       };
     },
 
-    async refresh(session) {
-      return oidc.refreshTokenGrant(await config(), session.refreshToken);
+    // Without a resource: a token for UserInfo; with one: a JWT for that service's API.
+    async refresh(session, resource) {
+      return oidc.refreshTokenGrant(await config(), session.refreshToken, resource ? { resource } : undefined);
     },
 
     async revoke(session) {

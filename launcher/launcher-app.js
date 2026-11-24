@@ -131,7 +131,7 @@ export function runLauncher() {
         notify();
       },
     })
-      .then(({ tokens, user }) => auth.session.signIn({ issuer: idp.issuer, user, tokens }))
+      .then(({ tokens, user }) => auth.session.signIn({ issuer: idp.issuer, user, tokens, resources: idp.resources }))
       .catch((err) => {
         if (!(err instanceof SignInError && err.code === 'cancelled')) {
           signInError = err instanceof SignInError && err.code === 'denied'

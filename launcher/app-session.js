@@ -2,14 +2,14 @@
 // home directory and encrypted with the OS keychain through Electron safeStorage.
 import path from 'node:path';
 import { safeStorage } from 'electron';
-import { createCrealikaId, resolveIssuer } from './core/crealika-id.js';
+import { createCrealikaId, resolveIssuer, resolveResources } from './core/crealika-id.js';
 import { createSession } from './core/session.js';
 import { SessionStore } from './core/session-store.js';
 
 export function createAppSession(lay) {
   const providers = new Map();
   const idpFor = (issuer) => {
-    if (!providers.has(issuer)) providers.set(issuer, createCrealikaId({ issuer }));
+    if (!providers.has(issuer)) providers.set(issuer, createCrealikaId({ issuer, resources: resolveResources(issuer) }));
     return providers.get(issuer);
   };
   const store = new SessionStore({
@@ -21,7 +21,7 @@ export function createAppSession(lay) {
   // Refresh and revoke go to the issuer the session came from, not the current default.
   const session = createSession({
     store,
-    refresh: (d) => idpFor(d.issuer).refresh(d),
+    refresh: (d, resource) => idpFor(d.issuer).refresh(d, resource),
     revoke: (d) => idpFor(d.issuer).revoke(d),
   });
   return {

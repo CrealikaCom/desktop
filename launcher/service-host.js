@@ -56,7 +56,7 @@ export function runServiceHost(id) {
     const { session } = createAppSession(lay);
     api = createLauncherApi({
       getSession: () => session.state(),
-      getToken: () => session.accessToken(),
+      getToken: (_id, resource) => session.accessToken(resource ?? ''),
       getPaths: async (sid) => ({
         home: lay.home,
         models: lay.models,

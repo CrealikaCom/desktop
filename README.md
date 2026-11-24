@@ -41,12 +41,17 @@ is stored in `<home>/config/crealika-id.session`, encrypted with the system keyc
 (Keychain on macOS, DPAPI on Windows, Secret Service or KWallet on Linux). **Sign out**
 deletes it and revokes it at Crealika ID.
 
-Services ask their host for the session (`/v1/session`) and a short-lived access token
-(`/v1/token`); they never see the stored sign-in itself.
+Services ask their host for the session (`/v1/session`) and short-lived access tokens; they
+never see the stored sign-in itself. At sign-in the launcher also asks for access to the Crealika
+services it knows (for crealika.com: the media library, `https://media.crealika.com`). A service
+gets a token for one of them with `/v1/token?resource=<service address>`; that token is accepted
+only by that service.
 
 Environment variables for development: `CREALIKA_ID_ISSUER` points the launcher at another
-Crealika ID instance (plain `http` only on localhost), and `CREALIKA_DESKTOP_NO_BROWSER=1`
-leaves the browser closed and shows the sign-in link in the launcher instead.
+Crealika ID instance (plain `http` only on localhost), `CREALIKA_ID_RESOURCES` replaces the list
+of services (`address=scope,...`, for example `http://localhost:4200=media`), and
+`CREALIKA_DESKTOP_NO_BROWSER=1` leaves the browser closed and shows the sign-in link in the
+launcher instead.
 
 ## Home directory
 

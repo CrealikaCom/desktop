@@ -4,7 +4,7 @@
 // - control token: the launcher pings, focuses and stops the service (/control/...).
 import http from 'node:http';
 
-const TOKEN_ERRORS = { signed_out: 401, expired: 401, unavailable: 503 };
+const TOKEN_ERRORS = { signed_out: 401, expired: 401, not_granted: 403, unavailable: 503 };
 
 export function createLauncherApi({ getSession, getPaths, getToken = null, controlToken = null, onControl = null }) {
   const tokens = new Map(); // token -> service id
@@ -13,7 +13,7 @@ export function createLauncherApi({ getSession, getPaths, getToken = null, contr
 
   async function handle(req, res) {
     const m = /^Bearer (\S+)$/.exec(req.headers.authorization ?? '');
-    const { pathname } = new URL(req.url, 'http://127.0.0.1');
+    const { pathname, searchParams } = new URL(req.url, 'http://127.0.0.1');
 
     if (pathname.startsWith('/control/')) {
       if (!controlToken || !onControl || !m || m[1] !== controlToken) return send(res, 401, { error: 'unauthorized' });
@@ -34,7 +34,7 @@ export function createLauncherApi({ getSession, getPaths, getToken = null, contr
     if (pathname === '/v1/token') {
       if (!getToken) return send(res, 401, { error: 'signed_out' });
       try {
-        return send(res, 200, await getToken(serviceId));
+        return send(res, 200, await getToken(serviceId, searchParams.get('resource') || undefined));
       } catch (err) {
         const status = TOKEN_ERRORS[err.code];
         if (!status) throw err;

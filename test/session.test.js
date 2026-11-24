@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { createLauncherApi } from '../launcher/core/api.js';
-import { SignInError, signInWithBrowser } from '../launcher/core/crealika-id.js';
+import { resolveResources, SignInError, signInWithBrowser } from '../launcher/core/crealika-id.js';
 import { createSession, GUEST, SessionError } from '../launcher/core/session.js';
 import { SessionStore } from '../launcher/core/session-store.js';
 
@@ -81,7 +81,7 @@ test('session: two processes refresh an expired token once and share the result'
   await assert.rejects(one.accessToken(), (e) => e instanceof SessionError && e.code === 'signed_out');
 
   await one.signIn({ issuer: ISSUER, user: USER, tokens: { access_token: 'at-0', refresh_token: 'rt-0', expires_in: 600 } });
-  assert.deepEqual(await two.state(), { mode: 'signed-in', issuer: ISSUER, user: USER });
+  assert.deepEqual(await two.state(), { mode: 'signed-in', issuer: ISSUER, user: USER, resources: [] });
   assert.equal((await two.accessToken()).access_token, 'at-0', 'fresh token is reused');
 
   clock += 600 * 1000; // expired
@@ -200,10 +200,12 @@ test('browser sign-in: denial, cancellation and timeout', async () => {
 
 test('host API: /v1/token maps session errors to status codes', async () => {
   let failure = null;
+  const asked = [];
   const api = createLauncherApi({
     getSession: async () => GUEST,
     getPaths: async () => ({}),
-    getToken: async () => {
+    getToken: async (id, resource) => {
+      asked.push([id, resource]);
       if (failure) throw new SessionError(failure);
       return { access_token: 'at', expires_at: 1 };
     },
@@ -213,7 +215,9 @@ test('host API: /v1/token maps session errors to status codes', async () => {
   const get = () => fetch(`${api.url}/v1/token`, { headers: { authorization: 'Bearer svc' } });
   try {
     assert.deepEqual(await (await get()).json(), { access_token: 'at', expires_at: 1 });
-    for (const [code, status] of [['signed_out', 401], ['expired', 401], ['unavailable', 503]]) {
+    await fetch(`${api.url}/v1/token?resource=${encodeURIComponent('https://media.example.test')}`, { headers: { authorization: 'Bearer svc' } });
+    assert.deepEqual(asked, [['echo', undefined], ['echo', 'https://media.example.test']]);
+    for (const [code, status] of [['signed_out', 401], ['expired', 401], ['not_granted', 403], ['unavailable', 503]]) {
       failure = code;
       const res = await get();
       assert.equal(res.status, status, code);
@@ -232,4 +236,57 @@ test('session: a lock held by a stuck process reads as unavailable', async () =>
   await store.write({ issuer: ISSUER, user: USER, refreshToken: 'rt', accessToken: 'at', accessExpiresAt: 0 });
   await fs.writeFile(store.lockFile, '{}');
   await assert.rejects(session.accessToken(), (e) => e instanceof SessionError && e.code === 'unavailable');
+});
+
+const MEDIA = 'https://media.example.test';
+
+test('session: each granted service gets its own token; others are refused', async () => {
+  const [store] = await stores('resources');
+  let clock = 0;
+  const calls = [];
+  const session = createSession({
+    store,
+    refresh: async (d, resource) => {
+      calls.push([d.refreshToken, resource]);
+      if (resource === 'https://jobs.example.test') throw { error: 'invalid_target' };
+      return { access_token: `at-${resource ?? 'id'}-${calls.length}`, refresh_token: `rt-${calls.length}`, expires_in: 600 };
+    },
+    revoke: async () => {},
+    now: () => clock,
+  });
+  await session.signIn({ issuer: ISSUER, user: USER, resources: [MEDIA], tokens: { access_token: 'at-id', refresh_token: 'rt-0', expires_in: 600 } });
+  assert.deepEqual((await session.state()).resources, [MEDIA]);
+
+  assert.equal((await session.accessToken()).access_token, 'at-id', 'Crealika ID token from sign-in');
+  const media = await session.accessToken(MEDIA);
+  assert.equal(media.access_token, `at-${MEDIA}-1`);
+  assert.deepEqual(calls, [['rt-0', MEDIA]]);
+  assert.equal((await session.accessToken(MEDIA)).access_token, media.access_token, 'cached until it expires');
+  assert.equal((await session.accessToken()).access_token, 'at-id', 'the Crealika ID token is kept');
+
+  await assert.rejects(session.accessToken('https://other.example.test'), (e) => e.code === 'not_granted');
+  assert.equal(calls.length, 1, 'no refresh for a service that was not granted');
+
+  // A service granted locally but refused by Crealika ID (e.g. removed) also reads as not granted.
+  await store.write({ ...(await store.read()), resources: [MEDIA, 'https://jobs.example.test'] });
+  await assert.rejects(session.accessToken('https://jobs.example.test'), (e) => e.code === 'not_granted');
+  assert.equal((await session.state()).mode, 'signed-in');
+});
+
+test('session: a sign-in stored before per-service tokens keeps working', async () => {
+  const [store] = await stores('legacy');
+  await store.write({ issuer: ISSUER, user: USER, refreshToken: 'rt', accessToken: 'old-at', accessExpiresAt: Date.now() + 600000 });
+  const session = createSession({ store, refresh: async () => ({}), revoke: async () => {} });
+  assert.equal((await session.accessToken()).access_token, 'old-at');
+  assert.deepEqual((await session.state()).resources, []);
+  await assert.rejects(session.accessToken(MEDIA), (e) => e.code === 'not_granted');
+});
+
+test('known services per issuer and the CREALIKA_ID_RESOURCES override', () => {
+  assert.deepEqual(resolveResources('https://crealika.com/auth', {}), { 'https://media.crealika.com': 'media' });
+  assert.deepEqual(resolveResources('http://localhost:4180/auth', {}), {});
+  assert.deepEqual(resolveResources('http://localhost:4180/auth', { CREALIKA_ID_RESOURCES: 'http://localhost:4200=media, https://x.test/api=jobs' }),
+    { 'http://localhost:4200': 'media', 'https://x.test/api': 'jobs' });
+  assert.deepEqual(resolveResources('https://crealika.com/auth', { CREALIKA_ID_RESOURCES: '' }), {});
+  assert.throws(() => resolveResources('x', { CREALIKA_ID_RESOURCES: 'no-scope' }), /resource=scope/);
 });
