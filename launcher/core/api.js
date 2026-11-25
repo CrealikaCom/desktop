@@ -1,12 +1,15 @@
 // Local API of the service host process.
 // Listens on 127.0.0.1 only. Two kinds of tokens:
-// - service token: the service backend asks for the session, an access token and paths (/v1/...);
+// - service token: the service backend asks for the session, an access token, paths and the
+//   interface preferences (/v1/...);
 // - control token: the launcher pings, focuses and stops the service (/control/...).
 import http from 'node:http';
 
 const TOKEN_ERRORS = { signed_out: 401, expired: 401, not_granted: 403, unavailable: 503 };
 
-export function createLauncherApi({ getSession, getPaths, getToken = null, controlToken = null, onControl = null }) {
+export function createLauncherApi({
+  getSession, getPaths, getToken = null, getPreferences = null, setPreferences = null, controlToken = null, onControl = null,
+}) {
   const tokens = new Map(); // token -> service id
   let server = null;
   let url = null;
@@ -28,6 +31,19 @@ export function createLauncherApi({ getSession, getPaths, getToken = null, contr
 
     const serviceId = m && tokens.get(m[1]);
     if (!serviceId) return send(res, 401, { error: 'unauthorized' });
+    if (pathname === '/v1/preferences' && getPreferences) {
+      if (req.method === 'GET') return send(res, 200, await getPreferences(serviceId));
+      if (req.method === 'PUT' && setPreferences) {
+        let body;
+        try {
+          body = await readJson(req);
+        } catch {
+          return send(res, 400, { error: 'bad_request' });
+        }
+        return send(res, 200, await setPreferences(serviceId, body));
+      }
+      return send(res, 405, { error: 'method_not_allowed' });
+    }
     if (req.method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });
     if (pathname === '/v1/session') return send(res, 200, await getSession(serviceId));
     if (pathname === '/v1/paths') return send(res, 200, await getPaths(serviceId));
@@ -79,4 +95,15 @@ export function createLauncherApi({ getSession, getPaths, getToken = null, contr
 function send(res, status, body) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(body));
+}
+
+async function readJson(req, limit = 16 * 1024) {
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > limit) throw new Error('request body is too large');
+    chunks.push(chunk);
+  }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }

@@ -1,0 +1,33 @@
+/* Crealika UI theme "Light" (id light): values of the --cr-* tokens only. Palette follows the logo. */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --cr-bg: #fbf7f0;
+  --cr-surface: #fffdf9;
+  --cr-surface-hover: #f4eee5;
+  --cr-surface-sunken: #f4ede3;
+  --cr-text: #2a1a3e;
+  --cr-text-muted: #6b6178;
+  --cr-border: #e6ddd1;
+  --cr-border-strong: #cbbfb0;
+  --cr-accent: #301944;
+  --cr-accent-hover: #47295f;
+  --cr-on-accent: #fbf7f0;
+  --cr-accent-soft: #ede5f4;
+  --cr-highlight: #ea9235;
+  --cr-highlight-text: #b0501d;
+  --cr-danger: #b3261e;
+  --cr-focus: #6b45c8;
+  --cr-bar-bg: #301944;
+  --cr-bar-text: #fbf7f0;
+  --cr-bar-hover: #47295f;
+  --cr-header-bg: rgba(251, 247, 240, 0.86);
+  --cr-tint-lavender: #eee6f4;
+  --cr-tint-peach: #fbe7d4;
+  --cr-tint-sage: #e8ecdf;
+  --cr-backdrop: rgba(32, 18, 46, 0.5);
+  --cr-shadow: rgba(48, 25, 68, 0.16);
+  --cr-radius-control: 10px;
+  --cr-radius-panel: 16px;
+  --cr-font: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

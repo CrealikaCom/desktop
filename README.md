@@ -53,6 +53,21 @@ of services (`address=scope,...`, for example `http://localhost:4200=media`), an
 `CREALIKA_DESKTOP_NO_BROWSER=1` leaves the browser closed and shows the sign-in link in the
 launcher instead.
 
+## Look and theme
+
+The launcher and services use Crealika UI core, the shared look of Crealika apps (tokens, themes,
+the Onest font, the app header, dialogs and building blocks). A copy lives in
+`vendor/crealika-ui-core`; update it from a checkout of the kit:
+
+```bash
+node scripts/sync-ui-core.js /path/to/crealika-ui-core
+```
+
+Language and theme are shared by the launcher and every service: they are stored in
+`<home>/config/preferences.json`, services read and change them through their host
+(`GET`/`PUT /v1/preferences`), and window chrome follows the theme. At sign-in the theme chosen
+in the Crealika account applies once. The interface is English-only for now.
+
 ## Home directory
 
 ```
@@ -65,7 +80,8 @@ launcher instead.
   cache/  logs/  config/  run/
 ```
 
-`config/crealika-id.session` and `config/crealika-id.lock` hold the shared sign-in.
+`config/crealika-id.session` and `config/crealika-id.lock` hold the shared sign-in;
+`config/preferences.json` holds the language and theme.
 
 ## Layout
 
@@ -76,7 +92,9 @@ launcher/
   service-host.js  service process: backend, window, registry, control
   app-session.js   Crealika ID session of this process, encrypted with safeStorage
   preload.cjs      launcher window bridge
-  ui/              launcher window
+  ui/              launcher window, served from launcher://app/
+vendor/
+  crealika-ui-core/  copy of Crealika UI core (scripts/sync-ui-core.js)
   core/            Electron-free, covered by tests
 catalog.json       built-in catalog
 test/              node --test; fixtures/echo is a test service

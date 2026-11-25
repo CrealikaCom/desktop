@@ -1,0 +1,921 @@
+/*
+ * Crealika UI core: the app header (cr-header), menus, dialogs, buttons, fields and a few
+ * building blocks. Uses only the --cr-* tokens from themes/*.css and the constants below; load it
+ * together with themes/index.css. Classes prefixed with cr- are the public contract (README).
+ */
+
+/* Interface font: Onest (OFL, fonts/OFL.txt), variable 100-900, Latin and Cyrillic subsets. */
+@font-face {
+  font-family: "Onest";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/onest-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Onest";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("fonts/onest-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+/*
+ * Kit constants (not theme tokens). Full-screen interfaces subtract the header height from 100dvh;
+ * --cr-bar-height is kept for apps that still use a compact bar. Page width and gutter are shared.
+ */
+:root {
+  --cr-bar-height: 44px;
+  --cr-header-height: 64px;
+  --cr-page-width: 1320px;
+  --cr-page-gutter: clamp(16px, 4vw, 48px);
+}
+
+/* Page column; apps wrap their main content in it to match the header width. */
+.cr-page {
+  box-sizing: border-box;
+  width: min(var(--cr-page-width), calc(100% - 2 * var(--cr-page-gutter)));
+  margin-inline: auto;
+}
+
+/* ---- app header (mountAppHeader) ---- */
+
+.cr-header {
+  position: sticky;
+  z-index: 900;
+  top: 0;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--cr-border);
+  background: var(--cr-header-bg);
+  color: var(--cr-text);
+  font: 500 15px/1.3 var(--cr-font);
+  -webkit-backdrop-filter: saturate(1.4) blur(16px);
+  backdrop-filter: saturate(1.4) blur(16px);
+}
+
+.cr-header *,
+.cr-header *::before,
+.cr-header *::after { box-sizing: border-box; }
+
+.cr-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(var(--cr-page-width), calc(100% - 2 * var(--cr-page-gutter)));
+  height: var(--cr-header-height);
+  margin-inline: auto;
+}
+
+.cr-header.is-fluid .cr-header-inner { width: calc(100% - 32px); }
+
+.cr-header a { color: inherit; text-decoration: none; }
+
+.cr-header :is(a, button):focus-visible {
+  outline: 2px solid var(--cr-focus);
+  outline-offset: 2px;
+}
+
+.cr-header-brand {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 44px;
+  margin-right: 4px;
+  padding: 0 4px;
+  border-radius: var(--cr-radius-control);
+}
+
+.cr-logo { display: block; width: auto; height: 30px; }
+
+/*
+ * The star above the "C" lifts the image centre above the letters: the middle of the lowercase
+ * "realika" sits at 72% of the logo height. The shift puts it on the header's centre line.
+ */
+.cr-header-brand .cr-logo { transform: translateY(-22%); }
+.cr-logo-dark { display: none; }
+:root[data-color-scheme="dark"] .cr-logo-light { display: none; }
+:root[data-color-scheme="dark"] .cr-logo-dark { display: block; }
+
+.cr-header-service {
+  flex: none;
+  padding: 4px 10px 4px 12px;
+  border-left: 1px solid var(--cr-border-strong);
+  color: var(--cr-text);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+a.cr-header-service:hover { color: var(--cr-highlight-text); }
+
+.cr-header-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 40px;
+  height: 40px;
+  margin: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--cr-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.cr-header-button:hover,
+.cr-header-button[aria-expanded="true"] { background: var(--cr-surface-hover); }
+
+.cr-header-button svg { flex: none; }
+
+.cr-header-popover { position: relative; flex: none; }
+
+.cr-switcher-label { font-size: 14px; }
+
+/* Switcher button of the current app: its name instead of "Services", after a divider. */
+.cr-switcher.is-service { padding-left: 8px; border-left: 1px solid var(--cr-border-strong); }
+.cr-switcher.is-service .cr-switcher-button { color: var(--cr-text); }
+.cr-switcher.is-service .cr-switcher-label { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+.cr-switcher.is-service .cr-switcher-button > svg:last-child { color: var(--cr-text-muted); }
+
+.cr-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  margin-left: 12px;
+}
+
+.cr-header-nav a {
+  position: relative;
+  padding: 8px 12px;
+  border-radius: var(--cr-radius-control);
+  color: var(--cr-text-muted);
+  font-size: 14px;
+  white-space: nowrap;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.cr-header-nav a:hover { background: var(--cr-surface-hover); color: var(--cr-text); }
+.cr-header-nav a[aria-current] { color: var(--cr-text); }
+
+.cr-header-nav a[aria-current]::after {
+  position: absolute;
+  right: 12px;
+  bottom: 2px;
+  left: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--cr-highlight);
+  content: "";
+}
+
+.cr-header-spacer { flex: 1; }
+
+/* navAlign: 'center' centres the navigation regardless of the width of the left and right parts. */
+.cr-header.is-nav-center .cr-header-inner { position: relative; }
+.cr-header.is-nav-center .cr-header-nav { position: absolute; left: 50%; margin-left: 0; transform: translateX(-50%); }
+
+.cr-header-actions,
+.cr-header-guest {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.cr-header-actions { gap: 8px; }
+.cr-header.is-pending .cr-header-actions { visibility: hidden; }
+
+.cr-language-code { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+
+.cr-header-signin.cr-button {
+  min-height: 40px;
+  padding-inline: 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cr-account-button { gap: 8px; max-width: 260px; padding: 0 8px 0 4px; border-radius: 999px; }
+
+.cr-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--cr-accent);
+  color: var(--cr-on-accent);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.cr-account-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cr-account-head {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px 6px;
+  color: var(--cr-text-muted);
+  font-size: 12px;
+}
+
+.cr-account-head strong {
+  overflow: hidden;
+  color: var(--cr-text);
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cr-header .cr-menu { min-width: 220px; }
+a.cr-menu-item { text-decoration: none; }
+.cr-menu-item[aria-checked="true"] { font-weight: 600; }
+
+.cr-menu-item[role="menuitemradio"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cr-menu-item[aria-checked="true"]::after { color: var(--cr-highlight-text); content: "✓"; }
+
+/* Switcher */
+
+.cr-switcher-panel {
+  position: absolute;
+  z-index: 1000;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(560px, calc(100vw - 24px));
+  padding: 10px;
+  border: 1px solid var(--cr-border);
+  border-radius: var(--cr-radius-panel);
+  background: var(--cr-surface);
+  color: var(--cr-text);
+  box-shadow: 0 18px 50px var(--cr-shadow);
+}
+
+.cr-switcher-panel[hidden] { display: none; }
+
+.cr-switcher-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cr-switcher-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  height: 100%;
+  padding: 12px;
+  border-radius: calc(var(--cr-radius-panel) - 6px);
+  transition: background-color 0.15s;
+}
+
+/* An item with onSelect is a button: same look as a link. */
+button.cr-switcher-item {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+:is(a, button).cr-switcher-item:hover,
+:is(a, button).cr-switcher-item:focus-visible { background: var(--cr-surface-hover); }
+.cr-switcher-item[aria-current] { background: var(--cr-accent-soft); }
+.cr-switcher-item.is-disabled { opacity: 0.55; cursor: default; }
+
+.cr-switcher-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--cr-tint-peach);
+  color: var(--cr-highlight-text);
+}
+
+.cr-switcher-list li:nth-child(3n + 2) .cr-switcher-icon { background: var(--cr-tint-lavender); color: var(--cr-text); }
+.cr-switcher-list li:nth-child(3n) .cr-switcher-icon { background: var(--cr-tint-sage); color: var(--cr-text); }
+
+.cr-switcher-text { display: grid; gap: 2px; min-width: 0; }
+
+.cr-switcher-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.cr-switcher-summary { color: var(--cr-text-muted); font-size: 13px; line-height: 1.35; }
+
+.cr-switcher-badge {
+  padding: 1px 7px;
+  border: 1px solid var(--cr-border-strong);
+  border-radius: 999px;
+  color: var(--cr-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.cr-switcher-badge.is-beta { border-color: transparent; background: var(--cr-tint-peach); color: var(--cr-highlight-text); }
+
+/* Drawer (narrow screens) */
+
+.cr-header-burger { display: none; }
+
+.cr-header-drawer {
+  display: grid;
+  gap: 18px;
+  width: min(var(--cr-page-width), calc(100% - 2 * var(--cr-page-gutter)));
+  max-height: calc(100dvh - var(--cr-header-height));
+  margin-inline: auto;
+  padding: 8px 0 20px;
+  overflow-y: auto;
+}
+
+.cr-header-drawer[hidden] { display: none; }
+
+.cr-drawer-nav { display: grid; gap: 2px; }
+
+.cr-drawer-nav a {
+  padding: 12px;
+  border-radius: var(--cr-radius-control);
+  font-size: 17px;
+  font-weight: 550;
+}
+
+.cr-drawer-nav a:hover { background: var(--cr-surface-hover); }
+.cr-drawer-nav a[aria-current] { color: var(--cr-highlight-text); }
+
+.cr-drawer-prefs {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 16px 12px 0;
+  border-top: 1px solid var(--cr-border);
+}
+
+.cr-drawer-label { color: var(--cr-text-muted); font-size: 13px; font-weight: 600; }
+
+.cr-segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--cr-surface-sunken);
+}
+
+.cr-segmented button {
+  flex: 1;
+  min-height: 36px;
+  margin: 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cr-text-muted);
+  font: 500 14px/1.2 var(--cr-font);
+  cursor: pointer;
+}
+
+.cr-segmented button[aria-pressed="true"] {
+  background: var(--cr-surface);
+  color: var(--cr-text);
+  box-shadow: 0 1px 3px var(--cr-shadow);
+}
+
+@media (max-width: 959px) {
+  .cr-header-nav { display: none; }
+  .cr-header.has-nav .cr-header-burger { display: inline-flex; }
+}
+
+@media (min-width: 720px) {
+  .cr-drawer-prefs { display: none; }
+}
+
+@media (max-width: 719px) {
+  .cr-header-guest,
+  .cr-switcher:not(.is-service) .cr-switcher-label,
+  .cr-switcher.is-service .cr-switcher-button > svg:first-child,
+  .cr-account-name,
+  .cr-account-button > svg { display: none; }
+  .cr-header.is-guest .cr-header-burger { display: inline-flex; }
+  .cr-header-service { padding-inline: 8px; font-size: 15px; }
+  .cr-switcher.is-service { padding-left: 4px; }
+  .cr-switcher.is-service .cr-switcher-label { font-size: 15px; }
+  .cr-logo { height: 26px; }
+  .cr-switcher { position: static; }
+  .cr-switcher-panel { right: 12px; left: 12px; width: auto; }
+  .cr-header-inner { gap: 4px; }
+  .cr-header-signin.cr-button { min-height: 36px; padding-inline: 14px; }
+}
+
+@media (max-width: 479px) {
+  .cr-switcher-list { grid-template-columns: minmax(0, 1fr); }
+  .cr-switcher-item { padding: 10px; }
+  .cr-header-service { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cr-header-button,
+  .cr-header-nav a,
+  .cr-switcher-item { transition: none; }
+}
+
+.cr-menu {
+  position: absolute;
+  z-index: 1000;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid var(--cr-border);
+  border-radius: var(--cr-radius-panel);
+  background: var(--cr-surface);
+  color: var(--cr-text);
+  box-shadow: 0 12px 40px var(--cr-shadow);
+}
+
+.cr-menu[hidden] { display: none; }
+
+.cr-menu-item {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: calc(var(--cr-radius-control) - 2px);
+  background: transparent;
+  color: inherit;
+  font: 400 15px/1.3 var(--cr-font);
+  text-align: start;
+  cursor: pointer;
+}
+
+.cr-menu-item:hover,
+.cr-menu-item:focus-visible {
+  outline: none;
+  background: var(--cr-surface-hover);
+}
+
+.cr-menu-separator {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--cr-border);
+}
+
+/* ---- dialogs ---- */
+
+.cr-dialog {
+  box-sizing: border-box;
+  width: min(520px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 24px;
+  overflow-y: auto;
+  border: 1px solid var(--cr-border);
+  border-radius: var(--cr-radius-panel);
+  background: var(--cr-surface);
+  color: var(--cr-text);
+  box-shadow: 0 20px 80px var(--cr-shadow);
+  font: 400 15px/1.45 var(--cr-font);
+  text-align: start;
+}
+
+.cr-dialog *,
+.cr-dialog *::before,
+.cr-dialog *::after { box-sizing: border-box; }
+
+.cr-dialog::backdrop { background: var(--cr-backdrop); }
+
+.cr-dialog-title,
+.cr-dialog h2 {
+  margin: 0 0 20px;
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.cr-dialog-body { display: grid; gap: 16px; }
+
+.cr-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.cr-field { display: grid; gap: 6px; }
+
+.cr-field > label,
+.cr-label {
+  display: block;
+  margin: 0;
+  color: var(--cr-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Kit fields only: other dialog content (editors, tables) is styled by the app. */
+.cr-field > :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]), select, textarea),
+.cr-input {
+  width: 100%;
+  min-height: 38px;
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--cr-border-strong);
+  border-radius: var(--cr-radius-control);
+  background: var(--cr-bg);
+  color: var(--cr-text);
+  font: inherit;
+}
+
+.cr-field > :is(input, select, textarea):focus-visible,
+.cr-input:focus-visible {
+  outline: 2px solid var(--cr-focus);
+  outline-offset: 1px;
+}
+
+/* ---- buttons ---- */
+
+.cr-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+  min-height: 38px;
+  margin: 0;
+  padding: 7px 16px;
+  border: 1px solid var(--cr-border-strong);
+  border-radius: var(--cr-radius-control);
+  background: var(--cr-surface);
+  color: var(--cr-text);
+  font: 500 15px/1.2 var(--cr-font);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.cr-button:hover { background: var(--cr-surface-hover); }
+
+.cr-button:focus-visible {
+  outline: 2px solid var(--cr-focus);
+  outline-offset: 2px;
+}
+
+.cr-button:disabled { opacity: 0.55; cursor: default; }
+
+.cr-button.cr-button-primary {
+  border-color: var(--cr-accent);
+  background: var(--cr-accent);
+  color: var(--cr-on-accent);
+}
+
+.cr-button.cr-button-primary:hover:not(:disabled) {
+  border-color: var(--cr-accent-hover);
+  background: var(--cr-accent-hover);
+}
+
+/* A disabled primary button looks neutral, so "nothing to save" is obvious. */
+.cr-button.cr-button-primary:disabled {
+  border-color: var(--cr-border);
+  background: var(--cr-surface-hover);
+  color: var(--cr-text-muted);
+  opacity: 1;
+}
+
+.cr-button.cr-button-danger {
+  border-color: var(--cr-danger);
+  color: var(--cr-danger);
+}
+
+/* ---- toast ---- */
+
+.cr-toast {
+  position: fixed;
+  z-index: 2000;
+  left: 50%;
+  bottom: 24px;
+  max-width: min(480px, calc(100% - 32px));
+  padding: 10px 16px;
+  border: 1px solid var(--cr-border);
+  border-radius: var(--cr-radius-panel);
+  background: var(--cr-surface);
+  color: var(--cr-text);
+  box-shadow: 0 12px 40px var(--cr-shadow);
+  font: 400 14px/1.4 var(--cr-font);
+  transform: translateX(-50%);
+}
+
+/* ---- collapsible section: <details class="cr-collapsible"><summary>…</summary><div class="cr-collapsible-body"> ---- */
+
+.cr-collapsible {
+  border: 1px solid var(--cr-border);
+  border-radius: var(--cr-radius-panel);
+  background: var(--cr-surface);
+}
+
+.cr-collapsible > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--cr-radius-panel);
+  color: var(--cr-text);
+  font: 600 15px/1.3 var(--cr-font);
+  list-style: none;
+  cursor: pointer;
+}
+
+.cr-collapsible > summary::-webkit-details-marker { display: none; }
+
+/* The ▸ triangle turns down when open. */
+.cr-collapsible > summary::before {
+  content: '';
+  flex: none;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid currentColor;
+  transition: transform 0.15s;
+}
+
+.cr-collapsible[open] > summary::before { transform: rotate(90deg); }
+.cr-collapsible > summary:hover { background: var(--cr-surface-hover); }
+
+.cr-collapsible > summary:focus-visible {
+  outline: 2px solid var(--cr-focus);
+  outline-offset: 2px;
+}
+
+.cr-collapsible-body { padding: 6px 14px 14px; }
+
+/* ---- two alternatives side by side: .cr-or-row > (block) .cr-or (block); stacked on narrow screens ---- */
+
+.cr-or-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+}
+
+.cr-or {
+  align-self: center;
+  color: var(--cr-text-muted);
+  font: 400 13px/1 var(--cr-font);
+}
+
+/* A cell without a drop zone: button and caption centred, level with the drop zone button next to it. */
+.cr-or-cell {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 140px;
+  padding: 16px;
+  text-align: center;
+}
+
+/* ---- file drop zone (createDropzone): centred button with a hint below ---- */
+
+.cr-dropzone {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 140px;
+  padding: 16px;
+  border: 2px dashed var(--cr-border-strong);
+  border-radius: var(--cr-radius-panel);
+  background: var(--cr-bg);
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.cr-dropzone.is-dragover {
+  border-color: var(--cr-accent);
+  background: var(--cr-surface-hover);
+}
+
+.cr-dropzone.is-disabled { opacity: 0.55; }
+
+.cr-dropzone-hint {
+  margin: 0;
+  color: var(--cr-text-muted);
+  font: 400 13px/1.35 var(--cr-font);
+}
+
+/* ---- picked file: .cr-picked > figure.cr-picked-figure (thumbnail up to 256px, centred caption below)
+   + .cr-picked-actions (centred in its half); a centred column on narrow screens ---- */
+
+.cr-picked {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.cr-picked-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.cr-picked-caption {
+  max-width: 256px;
+  margin: 0;
+  color: var(--cr-text-muted);
+  font: 400 13px/1.35 var(--cr-font);
+  text-align: center;
+}
+
+/* The limit is in px: a percentage does not count when sizing the grid column, which would grow. */
+.cr-picked-image {
+  display: block;
+  max-width: 256px;
+  max-height: 256px;
+  border: 1px solid var(--cr-border);
+  border-radius: var(--cr-radius-control);
+  background: var(--cr-bg);
+  object-fit: contain;
+}
+
+.cr-picked-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: center;
+}
+
+/* ---- slider (createSlider): label and value above the track, accent fill up to the thumb ---- */
+
+.cr-slider { --cr-slider-fill: 0%; display: grid; gap: 6px; min-width: 0; }
+.cr-slider-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.cr-slider-value { color: var(--cr-text); font-size: 13px; font-variant-numeric: tabular-nums; }
+.cr-slider.is-disabled { opacity: 0.5; }
+
+.cr-slider-input {
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.cr-slider-input:disabled { cursor: default; }
+.cr-slider-input:focus-visible { outline: 2px solid var(--cr-focus); outline-offset: 2px; border-radius: 999px; }
+
+.cr-slider-input::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--cr-highlight) var(--cr-slider-fill), var(--cr-border-strong) var(--cr-slider-fill));
+}
+.cr-slider-input::-moz-range-track { height: 6px; border-radius: 999px; background: var(--cr-border-strong); }
+.cr-slider-input::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--cr-highlight); }
+
+.cr-slider-input::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+  border: 2px solid var(--cr-highlight);
+  border-radius: 50%;
+  background: var(--cr-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.cr-slider-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--cr-highlight);
+  border-radius: 50%;
+  background: var(--cr-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.cr-slider-input:not(:disabled):active::-webkit-slider-thumb { transform: scale(1.1); }
+
+/* ---- long-running action (createBusy): replaces the form while the action runs ---- */
+
+.cr-busy {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 320px;
+  padding: 32px 20px;
+  border: 1px solid var(--cr-border);
+  border-radius: var(--cr-radius-panel);
+  background: var(--cr-surface);
+  text-align: center;
+}
+
+.cr-busy-title {
+  margin: 0;
+  color: var(--cr-text);
+  font: 600 18px/1.3 var(--cr-font);
+}
+
+.cr-busy-hint {
+  margin: 0;
+  color: var(--cr-text-muted);
+  font: 400 14px/1.4 var(--cr-font);
+}
+
+.cr-busy-track {
+  position: relative;
+  width: min(320px, 100%);
+  height: 6px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--cr-surface-hover);
+}
+
+.cr-busy-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--cr-accent);
+  transition: width 0.4s ease;
+}
+
+.cr-busy-track.is-indeterminate .cr-busy-bar {
+  position: absolute;
+  left: -35%;
+  width: 35%;
+  animation: cr-indeterminate 1.4s ease-in-out infinite;
+}
+
+.cr-busy-time {
+  margin: 0;
+  color: var(--cr-text-muted);
+  font: 400 12px/1.3 var(--cr-font);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes cr-indeterminate { to { left: 100%; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cr-busy-track.is-indeterminate .cr-busy-bar { left: 0; width: 100%; opacity: 0.5; animation: none; }
+}
+
+@media (max-width: 560px) {
+  .cr-or-row { grid-template-columns: minmax(0, 1fr); }
+  .cr-picked { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .cr-or { justify-self: center; }
+  .cr-or-cell { min-height: 0; }
+}
+
+@media (max-width: 480px) {
+  .cr-dialog { padding: 18px; }
+  .cr-dialog-actions { justify-content: stretch; }
+  .cr-dialog-actions > .cr-button { flex: 1 1 auto; }
+}

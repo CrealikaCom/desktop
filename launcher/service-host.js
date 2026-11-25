@@ -4,11 +4,12 @@
 // Closing the window shuts the service down.
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
-import { app, BrowserWindow, dialog, shell } from 'electron';
+import { app, BrowserWindow, dialog, nativeTheme, shell } from 'electron';
 import { createAppSession } from './app-session.js';
 import { createLauncherApi } from './core/api.js';
 import { ensureHome, resolveHome } from './core/home.js';
 import { readManifest } from './core/manifest.js';
+import { createPreferences, themeSource } from './core/preferences.js';
 import { removeRun, writeRun } from './core/registry.js';
 import { ServiceRunner } from './core/runner.js';
 
@@ -54,9 +55,23 @@ export function runServiceHost(id) {
     const controlToken = randomBytes(32).toString('base64url');
     // The launcher signs in; every host reads the same shared session.
     const { session } = createAppSession(lay);
+    // Interface preferences are shared too; window chrome (scrollbars, menus) follows the theme.
+    const preferences = createPreferences(lay);
+    const followTheme = async () => {
+      nativeTheme.themeSource = themeSource((await preferences.read()).theme);
+    };
+    await followTheme();
+    const themeTimer = setInterval(() => followTheme().catch(() => {}), 2000);
+    app.on('before-quit', () => clearInterval(themeTimer));
     api = createLauncherApi({
       getSession: () => session.state(),
       getToken: (_id, resource) => session.accessToken(resource ?? ''),
+      getPreferences: () => preferences.read(),
+      setPreferences: async (_id, update) => {
+        const next = await preferences.write(update);
+        nativeTheme.themeSource = themeSource(next.theme);
+        return next;
+      },
       getPaths: async (sid) => ({
         home: lay.home,
         models: lay.models,

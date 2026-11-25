@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "system": { "light": "light", "dark": "dark" },
+  "themes": [
+    { "id": "light", "colorScheme": "light", "name": { "en": "Light", "ru": "Светлая" } },
+    { "id": "dark", "colorScheme": "dark", "name": { "en": "Dark", "ru": "Тёмная" } }
+  ]
+}

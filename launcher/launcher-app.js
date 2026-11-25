@@ -1,19 +1,33 @@
 // Launcher window: catalog, installation and starting of services. Services are separate
 // processes (service-host.js) not owned by the launcher: closing it leaves them running.
 import { spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { app, BrowserWindow, ipcMain, nativeTheme, net, protocol, shell } from 'electron';
 import { createAppSession } from './app-session.js';
 import { loadCatalogs } from './core/catalog.js';
 import { ensureHome, resolveHome } from './core/home.js';
 import { install, listInstalled, uninstall } from './core/installer.js';
 import { SignInError, signInWithBrowser } from './core/crealika-id.js';
+import { createPreferences, themeSource } from './core/preferences.js';
 import { control, listRunning, readRun } from './core/registry.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(here, '..');
 const POLL_MS = 2000;
+const UI_DIR = path.join(here, 'ui');
+const CORE_DIR = path.join(appRoot, 'vendor', 'crealika-ui-core');
+const TYPES = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
+  '.svg': 'image/svg+xml', '.webp': 'image/webp', '.woff2': 'font/woff2',
+};
+
+// The launcher window is served from launcher://app/ rather than file://, so ES modules and fetch
+// work and the Crealika UI core loads like on a website.
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'launcher', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+]);
 
 export function runLauncher() {
   if (!app.requestSingleInstanceLock()) {
@@ -21,7 +35,7 @@ export function runLauncher() {
     return;
   }
 
-  let lay, mainWindow, auth;
+  let lay, mainWindow, auth, preferences;
   // One browser sign-in at a time: { url, abort } while waiting for the browser.
   let signIn = null;
   let signInError = null;
@@ -37,6 +51,7 @@ export function runLauncher() {
     return {
       home: lay.home,
       session: await auth.session.state(),
+      preferences: await followPreferences(),
       signIn: signIn ? { url: signIn.url } : null,
       signInError,
       weakStorage: auth.weakStorage(),
@@ -131,7 +146,11 @@ export function runLauncher() {
         notify();
       },
     })
-      .then(({ tokens, user }) => auth.session.signIn({ issuer: idp.issuer, user, tokens, resources: idp.resources }))
+      .then(async ({ tokens, user }) => {
+        await auth.session.signIn({ issuer: idp.issuer, user, tokens, resources: idp.resources });
+        // The theme chosen in the account wins once, at sign-in.
+        if (user.theme) await applyPreferences({ theme: user.theme });
+      })
       .catch((err) => {
         if (!(err instanceof SignInError && err.code === 'cancelled')) {
           signInError = err instanceof SignInError && err.code === 'denied'
@@ -143,6 +162,40 @@ export function runLauncher() {
         signIn = null;
         notify();
       });
+  }
+
+  // Services may change the preferences too; window chrome follows whatever is stored.
+  async function followPreferences() {
+    const current = await preferences.read();
+    nativeTheme.themeSource = themeSource(current.theme);
+    return current;
+  }
+
+  async function applyPreferences(update) {
+    const next = await preferences.write(update);
+    nativeTheme.themeSource = themeSource(next.theme);
+    notify();
+    return next;
+  }
+
+  // launcher://app/<path>: the launcher UI and, under /crealika-ui-core/, the vendored kit.
+  // index.html gets the current preferences so the theme applies before the first paint.
+  async function serveUi(request) {
+    const { pathname } = new URL(request.url);
+    const rel = decodeURIComponent(pathname === '/' ? '/index.html' : pathname);
+    const [base, sub] = rel.startsWith('/crealika-ui-core/') ? [CORE_DIR, rel.slice('/crealika-ui-core/'.length)] : [UI_DIR, rel.slice(1)];
+    const file = path.resolve(base, sub);
+    if (!file.startsWith(base + path.sep)) return new Response('Forbidden', { status: 403 });
+    const type = TYPES[path.extname(file)] ?? 'application/octet-stream';
+    if (file === path.join(UI_DIR, 'index.html')) {
+      const prefs = await preferences.read();
+      const meta = JSON.stringify({ locale: prefs.locale, theme: prefs.theme }).replaceAll('"', '&quot;');
+      const html = (await fs.readFile(file, 'utf8')).replace('<!--preferences-->', `<meta name="crealika-preferences" content="${meta}">`);
+      return new Response(html, { headers: { 'content-type': type } });
+    }
+    const res = await net.fetch(pathToFileURL(file).href).catch(() => null);
+    if (!res?.ok) return new Response('Not found', { status: 404 });
+    return new Response(res.body, { headers: { 'content-type': type } });
   }
 
   function handle(channel, fn) {
@@ -164,6 +217,9 @@ export function runLauncher() {
   async function main() {
     lay = await ensureHome(resolveHome());
     auth = createAppSession(lay);
+    preferences = createPreferences(lay);
+    nativeTheme.themeSource = themeSource((await preferences.read()).theme);
+    protocol.handle('launcher', serveUi);
 
     handle('state', state);
     handle('install', async (id) => {
@@ -181,6 +237,7 @@ export function runLauncher() {
       }),
     );
     handle('open', openService);
+    handle('set-preferences', (update) => applyPreferences(update));
     handle('sign-in', startSignIn);
     handle('sign-in-cancel', () => signIn?.abort.abort());
     handle('sign-in-reopen', () => signIn?.url && shell.openExternal(signIn.url));
@@ -214,7 +271,7 @@ export function runLauncher() {
     // Services start and stop on their own, so the launcher window refreshes on a timer.
     const timer = setInterval(notify, POLL_MS);
     mainWindow.on('closed', () => clearInterval(timer));
-    await mainWindow.loadFile(path.join(here, 'ui', 'index.html'));
+    await mainWindow.loadURL('launcher://app/index.html');
   }
 
   app.on('second-instance', showWindow);

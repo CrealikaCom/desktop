@@ -18,5 +18,6 @@ contextBridge.exposeInMainWorld('launcher', {
   cancelSignIn: () => call('sign-in-cancel'),
   reopenSignIn: () => call('sign-in-reopen'),
   signOut: () => call('sign-out'),
+  setPreferences: (update) => call('set-preferences', update),
   onChange: (fn) => ipcRenderer.on('state-changed', () => fn()),
 });
