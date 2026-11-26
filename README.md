@@ -76,23 +76,34 @@ offers the builds for your system: CPU, Vulkan (most GPUs), CUDA (NVIDIA, a larg
 Metal (Apple Silicon). The recommended build is Metal on a Mac, else Vulkan when the system has
 the Vulkan loader, else CPU. Installing a service also installs the engines its manifest lists.
 
-| Engine | Server | Models |
-|---|---|---|
-| `llama` | llama.cpp `llama-server` in router mode, OpenAI-compatible API | `.gguf` files in `<home>/models/llm/` |
+| Engine | Server | Models | Builds |
+|---|---|---|---|
+| `llama` | llama.cpp `llama-server` in router mode, OpenAI-compatible API | `.gguf` files in `<home>/models/llm/`, loaded on request | Windows, Linux, macOS |
+| `sd` | stable-diffusion.cpp `sd-server`: OpenAI-compatible, WebUI-compatible and native APIs | `<home>/models/sd/` in its category folders (`checkpoints/`, `diffusion_models/`, `vae/`, ...), loaded on request | Windows x64, Linux x64 |
+| `whisper` | whisper.cpp `whisper-server`, `POST /inference` | one `ggml-*.bin` file from `<home>/models/whisper/` per process | Windows x64, Linux x64 (CPU) |
+
+Most builds are the engines' own releases. Where those do not fit, they come from
+[CrealikaCom/engine-builds](https://github.com/CrealikaCom/engine-builds): stable-diffusion.cpp for
+Linux (built for older glibc) and whisper.cpp (with an API key added to its server).
 
 An engine runs as a separate process shared by all services. A service asks its host for it:
 
 | Request | Answer |
 |---|---|
-| `GET /v1/engines` | `{engines: [{id, name, version, accel, installed, running, declared, models}], external: [...]}` |
-| `POST /v1/engines/<id>/acquire` | `{id, url, apiKey, version, accel, models}`; starts the engine if it is not running |
+| `GET /v1/engines` | `{engines: [{id, name, version, accel, installed, running, declared, perModel, models}], external: [...]}` |
+| `POST /v1/engines/<id>/acquire` | `{id, instance, model, url, apiKey, version, accel, models}`; starts the engine if it is not running |
 | `POST /v1/engines/<id>/release` | `{ok: true}` |
-| errors | 409 `not_installed`, 403 `not_declared` (not in the manifest's `engines`), 404 `unknown_engine`, 503 `start_failed` |
+| errors | 409 `not_installed`, 403 `not_declared` (not in the manifest's `engines`), 404 `unknown_engine`, 400 `model_required`, 404 `model_not_found`, 503 `start_failed` |
+
+Engines with `perModel` (whisper.cpp) load one model when they start, so they run one process per
+model file: send `{"model": "<file in the models folder>"}` with `acquire`, and with `release` to
+let go of one model (without it, `release` lets go of all of them). Other engines ignore `model`.
 
 The engine listens on `127.0.0.1` and requires `apiKey` as a bearer token; send the key only to
-that address. It keeps running while any service holds it and stops when the last one releases
-it or exits. If a service crashes, the launcher stops the engines nobody holds anymore. State is
-in `<home>/run/engines/<id>.json`, the log in `<home>/logs/engine-<id>.log`.
+that address. The launcher passes the key to the engine in a file, so it does not show in the
+process list. The engine keeps running while any service holds it and stops when the last one
+releases it or exits. If a service crashes, the launcher stops the engines nobody holds anymore.
+State is in `<home>/run/engines/<instance>.json`, the log in `<home>/logs/engine-<id>.log`.
 
 `external` lists engines you run yourself that answered on their usual local address: Ollama
 (`127.0.0.1:11434`), LM Studio (`127.0.0.1:1234`) and ComfyUI (`127.0.0.1:8188`). Other
@@ -105,8 +116,8 @@ addresses, and your own engine builds, go into `<home>/config/engines.json`:
 }
 ```
 
-`node scripts/engine-builds.js llama <release tag>` prints the builds of a llama.cpp release
-with their sizes and sha256 digests for `engines.json`.
+`node scripts/engine-builds.js <llama|sd|whisper> <version>` prints the builds of an engine
+version with their sizes and sha256 digests for `engines.json`.
 
 ## Home directory
 

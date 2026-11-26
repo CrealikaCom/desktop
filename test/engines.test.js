@@ -66,6 +66,22 @@ async function installFake() {
   return engine;
 }
 
+async function installFakePerModel() {
+  const archive = await makeArchive('fake-model', { 'fake-server': await fs.readFile(FAKE_SERVER) });
+  const engine = validateEngine({
+    id: 'fakem',
+    name: 'Fake per-model engine',
+    version: 'v1',
+    server: 'fake-server',
+    models: 'fakem',
+    health: '/health',
+    args: ['--host', '{host}', '--port', '{port}', '--api-key-file', '{apiKeyFile}', '-m', '{model}'],
+    builds: [{ os: process.platform, arch: process.arch, accel: 'cpu', files: [archive] }],
+  }, 'test');
+  await installEngine(engine, engine.builds[0], lay);
+  return engine;
+}
+
 test('built-in engine catalog is valid and has a build for every desktop platform', async () => {
   const { engines } = await loadEngineCatalogs([BUILTIN]);
   const llama = engines.find((e) => e.id === 'llama');
@@ -74,12 +90,30 @@ test('built-in engine catalog is valid and has a build for every desktop platfor
     assert.ok(buildsFor(llama, { os: os_, arch }).length, `${os_} ${arch}`);
   }
   for (const b of llama.builds) for (const f of b.files) assert.match(f.url, /^https:\/\/github\.com\/ggml-org\/llama\.cpp\/releases\/download\//);
+  assert.equal(llama.perModel, false);
+
+  // stable-diffusion.cpp and whisper.cpp: Windows x64 and Linux x64 for now.
+  const sd = engines.find((e) => e.id === 'sd');
+  const whisper = engines.find((e) => e.id === 'whisper');
+  assert.ok(sd && whisper);
+  for (const engine of [sd, whisper]) {
+    for (const [os_, arch] of [['linux', 'x64'], ['win32', 'x64']]) {
+      assert.ok(buildsFor(engine, { os: os_, arch }).some((b) => b.accel === 'cpu'), `${engine.id} ${os_} ${arch}`);
+    }
+  }
+  assert.equal(sd.perModel, false);
+  assert.equal(whisper.perModel, true);
+  const own = /^https:\/\/github\.com\/CrealikaCom\/engine-builds\/releases\/download\//;
+  for (const b of whisper.builds) for (const f of b.files) assert.match(f.url, own);
+  for (const b of sd.builds.filter((x) => x.os === 'linux')) for (const f of b.files) assert.match(f.url, own);
 });
 
 test('engine catalog: placeholders, api key, protocols and checksums are checked', () => {
   const file = { url: 'https://example.com/a.tar.gz', sha256: 'a'.repeat(64) };
   assert.ok(engineDef([file]));
   assert.throws(() => engineDef([file], { args: ['--port', '{port}'] }), /apiKey/);
+  assert.equal(engineDef([file], { args: ['--api-key-file', '{apiKeyFile}'] }).perModel, false);
+  assert.equal(engineDef([file], { args: ['--api-key-file', '{apiKeyFile}', '-m', '{model}'] }).perModel, true);
   assert.throws(() => engineDef([file], { args: ['--api-key', '{apiKey}', '{secret}'] }), /placeholder/);
   assert.throws(() => engineDef([{ ...file, url: 'http://example.com/a.tar.gz' }]), /protocol/);
   assert.throws(() => engineDef([{ ...file, sha256: 'x' }]), /sha256/);
@@ -197,6 +231,75 @@ test('a crashed engine is started again on the next acquire', async () => {
   assert.equal((await listRunningEngines(lay)).size, 0);
 });
 
+test('a per-model engine runs one process per model file, with the key in a file', async () => {
+  const engine = await installFakePerModel();
+  const dirModels = path.join(lay.models, 'fakem');
+  await fs.mkdir(path.join(dirModels, 'sub'), { recursive: true });
+  await fs.writeFile(path.join(dirModels, 'a.bin'), 'a');
+  await fs.writeFile(path.join(dirModels, 'sub', 'b.bin'), 'b');
+  const opts = (model) => ({ model, launch: launchNode, readyTimeoutMs: 15000 });
+  const alpha = { pid: process.pid, service: 'alpha' };
+  const beta = { pid: process.pid, service: 'beta' };
+
+  await assert.rejects(acquireEngine(lay, engine, alpha, opts(null)), (err) => err.code === 'model_required');
+  await assert.rejects(acquireEngine(lay, engine, alpha, opts('../../etc/passwd')), (err) => err.code === 'model_not_found');
+  await assert.rejects(acquireEngine(lay, engine, alpha, opts('/etc/passwd')), (err) => err.code === 'model_not_found');
+  await assert.rejects(acquireEngine(lay, engine, alpha, opts('missing.bin')), (err) => err.code === 'model_not_found');
+
+  const a1 = await acquireEngine(lay, engine, alpha, opts('a.bin'));
+  const a2 = await acquireEngine(lay, engine, beta, opts('./a.bin'));
+  const b = await acquireEngine(lay, engine, alpha, opts('sub\\b.bin'));
+  assert.equal(a1.url, a2.url, 'the same model is shared');
+  assert.notEqual(a1.url, b.url, 'another model gets its own process');
+  assert.equal(b.model, 'sub/b.bin');
+  const ask = async (info) => (await fetch(new URL('/v1/models', info.url), { headers: { authorization: `Bearer ${info.apiKey}` } })).json();
+  const ra = await ask(a1);
+  const rb = await ask(b);
+  assert.equal(ra.data[0].id, 'a.bin');
+  assert.equal(rb.data[0].id, 'b.bin');
+  assert.equal(ra.argv.includes(a1.apiKey), false, 'the key is not on the command line');
+  const keyPath = ra.argv[ra.argv.indexOf('--api-key-file') + 1];
+  assert.equal((await fs.stat(keyPath)).mode & 0o777, 0o600);
+
+  const running = (await listRunningEngines(lay)).get('fakem');
+  assert.deepEqual(running.instances.map((i) => i.model).sort(), ['a.bin', 'sub/b.bin']);
+  assert.deepEqual(running.services.sort(), ['alpha', 'beta']);
+
+  await releaseEngine(lay, a1.instance, alpha);
+  assert.ok(isAlive(ra.pid), 'beta still uses a.bin');
+  await releaseEngine(lay, a1.instance, beta);
+  assert.equal(isAlive(ra.pid), false);
+  await assert.rejects(fs.access(keyPath), 'the key file goes with the process');
+  await releaseEngine(lay, b.instance, alpha);
+  assert.equal(isAlive(rb.pid), false);
+  assert.equal((await listRunningEngines(lay)).size, 0);
+});
+
+test('host engines: models for per-model engines, release by model or all at once', async () => {
+  const engine = await installFakePerModel();
+  const files = [path.join(tmp, 'host-engines-m.json')];
+  await fs.writeFile(files[0], JSON.stringify({ engines: [{ ...engine, builds: engine.builds }] }));
+  await fs.writeFile(path.join(lay.models, 'fakem', 'a.bin'), 'a');
+  await fs.writeFile(path.join(lay.models, 'fakem', 'c.bin'), 'c');
+  const host = createHostEngines({ lay, manifest: { id: 'svc', engines: ['fakem'] }, files });
+  const list = await host.list();
+  assert.equal(list.engines[0].perModel, true);
+  await assert.rejects(host.acquire('svc', 'fakem'), (err) => err.code === 'model_required');
+  // The host launches real processes here, so point the server at Node through a wrapper.
+  const wrapper = path.join(lay.engines, 'fakem', 'fake-server');
+  if (process.platform === 'win32') return;
+  await fs.writeFile(wrapper, `#!/bin/sh\nexec "${process.execPath}" "${FAKE_SERVER}" "$@"\n`);
+  await fs.chmod(wrapper, 0o755);
+  const a = await host.acquire('svc', 'fakem', { model: 'a.bin' });
+  const c = await host.acquire('svc', 'fakem', { model: 'c.bin' });
+  await host.release('svc', 'fakem', { model: 'a.bin' });
+  const running = (await listRunningEngines(lay)).get('fakem');
+  assert.deepEqual(running.instances.map((i) => i.model), ['c.bin']);
+  await host.release('svc', 'fakem');
+  assert.equal((await listRunningEngines(lay)).size, 0);
+  assert.notEqual(a.url, c.url);
+});
+
 test('host engines: only engines from the manifest, unknown engines rejected', async () => {
   const files = [path.join(tmp, 'host-engines.json')];
   const engine = await installFake();
@@ -215,20 +318,20 @@ test('host API: engine list, acquire and release, errors as statuses', async () 
     getPaths: async () => ({}),
     engines: {
       list: async () => ({ engines: [{ id: 'llama' }], external: [] }),
-      acquire: async (sid, id) => {
-        calls.push(['acquire', sid, id]);
+      acquire: async (sid, id, options) => {
+        calls.push(['acquire', sid, id, options]);
         if (id === 'missing') throw new EngineError('not_installed', 'install it');
         return { id, url: 'http://127.0.0.1:1', apiKey: 'k' };
       },
-      release: async (sid, id) => {
-        calls.push(['release', sid, id]);
+      release: async (sid, id, options) => {
+        calls.push(['release', sid, id, options]);
         return { ok: true };
       },
     },
   });
   await api.start();
   api.register('tok', 'svc');
-  const req = (p, method = 'GET') => fetch(api.url + p, { method, headers: { authorization: 'Bearer tok' } });
+  const req = (p, method = 'GET', body = undefined) => fetch(api.url + p, { method, body, headers: { authorization: 'Bearer tok' } });
   try {
     assert.deepEqual(await (await req('/v1/engines')).json(), { engines: [{ id: 'llama' }], external: [] });
     assert.equal((await (await req('/v1/engines/llama/acquire', 'POST')).json()).apiKey, 'k');
@@ -238,7 +341,12 @@ test('host API: engine list, acquire and release, errors as statuses', async () 
     assert.equal((await missing.json()).error, 'not_installed');
     assert.equal((await req('/v1/engines/llama/release', 'POST')).status, 200);
     assert.equal((await req('/v1/engines/Bad/acquire', 'POST')).status, 405);
-    assert.deepEqual(calls, [['acquire', 'svc', 'llama'], ['acquire', 'svc', 'missing'], ['release', 'svc', 'llama']]);
+    assert.equal((await req('/v1/engines/whisper/acquire', 'POST', JSON.stringify({ model: 'tiny.bin' }))).status, 200);
+    assert.equal((await req('/v1/engines/whisper/acquire', 'POST', '{bad')).status, 400);
+    assert.deepEqual(calls, [
+      ['acquire', 'svc', 'llama', {}], ['acquire', 'svc', 'missing', {}], ['release', 'svc', 'llama', {}],
+      ['acquire', 'svc', 'whisper', { model: 'tiny.bin' }],
+    ]);
   } finally {
     await api.close();
   }

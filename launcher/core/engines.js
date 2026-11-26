@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildsFor, currentPlatform, detectAccelerators, loadEngineCatalogs, recommendedBuild } from './engine-catalog.js';
 import { readInstalledEngine } from './engine-installer.js';
-import { acquireEngine, EngineError, listRunningEngines, releaseEngine } from './engine-runner.js';
+import { acquireEngine, EngineError, engineInstance, heldInstances, listRunningEngines, releaseEngine } from './engine-runner.js';
 import { findExternalEngines } from './external-engines.js';
 
 const BUILTIN = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'engines.json');
@@ -15,7 +15,7 @@ export function engineCatalogFiles(lay, builtin = BUILTIN) {
 
 /**
  * Engines for this computer:
- * [{ id, name, description, version, models, builds: [{accel, size}], recommended, installed, running }]
+ * [{ id, name, description, version, models, perModel, builds: [{accel, size}], recommended, installed, running }]
  * plus the accelerators found and the external engines that answered.
  */
 export async function engineOverview(lay, { files = engineCatalogFiles(lay), platform = currentPlatform(), external = true } = {}) {
@@ -31,6 +31,7 @@ export async function engineOverview(lay, { files = engineCatalogFiles(lay), pla
       description: e.description,
       version: e.version,
       models: path.join(lay.models, e.models),
+      perModel: e.perModel,
       builds: builds.map((b) => ({ accel: b.accel, size: b.files.every((f) => f.size) ? b.files.reduce((s, f) => s + f.size, 0) : null })),
       recommended: recommendedBuild(builds, detected)?.accel ?? null,
       installed: installed ? { version: installed.version, accel: installed.accel } : null,
@@ -47,10 +48,11 @@ export async function engineOverview(lay, { files = engineCatalogFiles(lay), pla
 
 /**
  * Engine requests of one service host: the service may use the engines its manifest declares.
- * Leases are held by this host process and released when it exits (releaseAll).
+ * Leases are held by this host process and released when it exits (releaseAll). Engines with
+ * perModel need { model }: a file in their models folder; each model runs as its own instance.
  */
 export function createHostEngines({ lay, manifest, files = engineCatalogFiles(lay), hostPid = process.pid }) {
-  const held = new Set();
+  const held = new Set(); // instance keys
   const holder = { pid: hostPid, service: manifest.id };
 
   async function engineFor(id) {
@@ -75,25 +77,32 @@ export function createHostEngines({ lay, manifest, files = engineCatalogFiles(la
           installed: Boolean(e.installed),
           running: Boolean(e.running),
           declared: manifest.engines.includes(e.id),
+          perModel: e.perModel,
           models: e.models,
         })),
         external: overview.external,
       };
     },
-    async acquire(_serviceId, id) {
+    async acquire(_serviceId, id, { model = null } = {}) {
       const engine = await engineFor(id);
-      const info = await acquireEngine(lay, engine, holder);
-      held.add(id);
+      const info = await acquireEngine(lay, engine, holder, { model });
+      held.add(info.instance);
       return info;
     },
-    async release(_serviceId, id) {
-      await engineFor(id);
-      await releaseEngine(lay, id, holder);
-      held.delete(id);
+    // Without a model, releases every instance of the engine this service holds.
+    async release(_serviceId, id, { model = null } = {}) {
+      const engine = await engineFor(id);
+      const keys = engine.perModel && model
+        ? [(await engineInstance(lay, engine, model, { mustExist: false })).key]
+        : await heldInstances(lay, id, holder);
+      for (const key of keys) {
+        await releaseEngine(lay, key, holder);
+        held.delete(key);
+      }
       return { ok: true };
     },
     async releaseAll() {
-      await Promise.allSettled([...held].map((id) => releaseEngine(lay, id, { pid: hostPid })));
+      await Promise.allSettled([...held].map((key) => releaseEngine(lay, key, { pid: hostPid })));
       held.clear();
     },
   };

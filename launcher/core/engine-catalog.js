@@ -1,5 +1,5 @@
-// Catalog of shared engines (llama.cpp and later others): pinned versions and prebuilt archives
-// per operating system, CPU architecture and accelerator. The built-in engines.json is extended
+// Catalog of shared engines (llama.cpp, stable-diffusion.cpp, whisper.cpp): pinned versions and
+// prebuilt archives per operating system, CPU architecture and accelerator. The built-in engines.json is extended
 // by <home>/config/engines.json: an engine with the same id replaces the built-in one, and
 // "external" lists addresses of engines the user runs themselves (Ollama, LM Studio, ComfyUI).
 import fs from 'node:fs/promises';
@@ -12,7 +12,9 @@ const OS = new Set(['linux', 'win32', 'darwin']);
 const ARCH = new Set(['x64', 'arm64']);
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const VERSION_RE = /^[A-Za-z0-9._-]{1,64}$/;
-const PLACEHOLDERS = new Set(['host', 'port', 'apiKey', 'models']);
+// {apiKeyFile}: a file holding the key, so it does not show in the process list.
+// {model}: the model file a service asks for; such an engine runs one process per model.
+const PLACEHOLDERS = new Set(['host', 'port', 'apiKey', 'apiKeyFile', 'models', 'model']);
 
 export function validateEngine(e, where) {
   if (!ID_RE.test(e?.id ?? '')) throw new Error(`${where}: invalid engine id ${JSON.stringify(e?.id)}`);
@@ -27,7 +29,9 @@ export function validateEngine(e, where) {
       if (!PLACEHOLDERS.has(name)) throw new Error(`${where}: unknown placeholder {${name}}`);
     }
   }
-  if (!e.args.some((a) => a.includes('{apiKey}'))) throw new Error(`${where}: args must pass {apiKey}`);
+  if (!e.args.some((a) => a.includes('{apiKey}') || a.includes('{apiKeyFile}'))) {
+    throw new Error(`${where}: args must pass {apiKey} or {apiKeyFile}`);
+  }
   if (!Array.isArray(e.builds)) throw new Error(`${where}: missing builds`);
   const seen = new Set();
   const builds = e.builds.map((b) => {
@@ -56,6 +60,7 @@ export function validateEngine(e, where) {
     models: e.models,
     health: e.health,
     args: [...e.args],
+    perModel: e.args.some((a) => a.includes('{model}')),
     builds,
   };
 }

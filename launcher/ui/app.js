@@ -91,7 +91,11 @@ function engineCard(e) {
     if (e.installed.version !== e.version) status += ` · ${e.version} available`;
   }
   const serviceName = (id) => state?.services.find((x) => x.id === id)?.name ?? id;
-  if (e.running) status += ` · running for ${e.running.services.map(serviceName).join(', ') || 'no service'}`;
+  if (e.running) {
+    status += ` · running for ${e.running.services.map(serviceName).join(', ') || 'no service'}`;
+    const models = e.running.instances.map((i) => i.model).filter(Boolean);
+    if (models.length) status += ` (${models.join(', ')})`;
+  }
 
   const actions = [];
   if (!e.builds.length) {

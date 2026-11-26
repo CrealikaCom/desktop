@@ -6,7 +6,9 @@
 import http from 'node:http';
 
 const TOKEN_ERRORS = { signed_out: 401, expired: 401, not_granted: 403, unavailable: 503 };
-const ENGINE_ERRORS = { unknown_engine: 404, not_declared: 403, not_installed: 409, start_failed: 503 };
+const ENGINE_ERRORS = {
+  unknown_engine: 404, not_declared: 403, not_installed: 409, start_failed: 503, model_required: 400, model_not_found: 404,
+};
 const ENGINE_PATH = /^\/v1\/engines\/([a-z][a-z0-9-]{1,31})\/(acquire|release)$/;
 
 export function createLauncherApi({
@@ -51,8 +53,16 @@ export function createLauncherApi({
     if (engineAction && engines) {
       if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' });
       const [, engineId, action] = engineAction;
+      // Optional body: { "model": "<file in the engine's models folder>" }.
+      let options;
       try {
-        return send(res, 200, action === 'acquire' ? await engines.acquire(serviceId, engineId) : await engines.release(serviceId, engineId));
+        const body = await readJson(req);
+        options = typeof body?.model === 'string' ? { model: body.model } : {};
+      } catch {
+        return send(res, 400, { error: 'bad_request' });
+      }
+      try {
+        return send(res, 200, action === 'acquire' ? await engines.acquire(serviceId, engineId, options) : await engines.release(serviceId, engineId, options));
       } catch (err) {
         const status = ENGINE_ERRORS[err.code];
         if (!status) throw err;

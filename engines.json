@@ -13,8 +13,8 @@
         "{host}",
         "--port",
         "{port}",
-        "--api-key",
-        "{apiKey}",
+        "--api-key-file",
+        "{apiKeyFile}",
         "--models-dir",
         "{models}"
       ],
@@ -170,6 +170,137 @@
               "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-macos-x64.tar.gz",
               "size": 12568191,
               "sha256": "80985ebbe0ac3029afb45b9442d1c9aa3cd8ac08b3b22b15f234e5360772377b"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sd",
+      "name": "stable-diffusion.cpp",
+      "description": "Image and video generation models (Stable Diffusion, SDXL, Flux and others) behind an HTTP API.",
+      "version": "master-1133-52491bd",
+      "server": "sd-server",
+      "models": "sd",
+      "health": "/",
+      "args": [
+        "--listen-ip",
+        "{host}",
+        "--listen-port",
+        "{port}",
+        "--api-key-file",
+        "{apiKeyFile}",
+        "--model-dir",
+        "{models}"
+      ],
+      "builds": [
+        {
+          "os": "linux",
+          "arch": "x64",
+          "accel": "cpu",
+          "files": [
+            {
+              "url": "https://github.com/CrealikaCom/engine-builds/releases/download/sd-master-1133-52491bd/sd-master-1133-52491bd-linux-x64-cpu.tar.gz",
+              "size": 26388559,
+              "sha256": "29f4f1a65da66e2e6376648ea242f04262efd7c37ae7c7790b29ae1deea8f0d4"
+            }
+          ]
+        },
+        {
+          "os": "linux",
+          "arch": "x64",
+          "accel": "vulkan",
+          "files": [
+            {
+              "url": "https://github.com/CrealikaCom/engine-builds/releases/download/sd-master-1133-52491bd/sd-master-1133-52491bd-linux-x64-vulkan.tar.gz",
+              "size": 39387748,
+              "sha256": "2fb28ae4fa75c1d7235d641823312337fbe73465effdffa59033fe344ce55102"
+            }
+          ]
+        },
+        {
+          "os": "win32",
+          "arch": "x64",
+          "accel": "cpu",
+          "files": [
+            {
+              "url": "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-1133-52491bd/sd-master-52491bd-bin-win-cpu-x64.zip",
+              "size": 19116688,
+              "sha256": "7d1c819708f7b922bebda2e1454b6224fa524480cb98bb7b0aea111f3c15678b"
+            }
+          ]
+        },
+        {
+          "os": "win32",
+          "arch": "x64",
+          "accel": "vulkan",
+          "files": [
+            {
+              "url": "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-1133-52491bd/sd-master-52491bd-bin-win-vulkan-x64.zip",
+              "size": 31077895,
+              "sha256": "976ed26dfc06c16b720fdf272d6445cdd7fe42056f2b1f53e4359e25d5a1d1f1"
+            }
+          ]
+        },
+        {
+          "os": "win32",
+          "arch": "x64",
+          "accel": "cuda",
+          "files": [
+            {
+              "url": "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-1133-52491bd/sd-master-52491bd-bin-win-cuda12-x64.zip",
+              "size": 413198691,
+              "sha256": "328d385394e571a6dd3d4e85d3097f9ccad372511f761f3beced83d69fd0a7cd"
+            },
+            {
+              "url": "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-1133-52491bd/cudart-sd-bin-win-cu12-x64.zip",
+              "size": 563452046,
+              "sha256": "fe20366827d357c00797eebb58244dddab7fd9a348d70090c3871004c320f38d"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "whisper",
+      "name": "whisper.cpp",
+      "description": "Speech recognition with Whisper models; one process per model file.",
+      "version": "b5907",
+      "server": "whisper-server",
+      "models": "whisper",
+      "health": "/health",
+      "args": [
+        "--host",
+        "{host}",
+        "--port",
+        "{port}",
+        "--api-key-file",
+        "{apiKeyFile}",
+        "-m",
+        "{model}"
+      ],
+      "builds": [
+        {
+          "os": "linux",
+          "arch": "x64",
+          "accel": "cpu",
+          "files": [
+            {
+              "url": "https://github.com/CrealikaCom/engine-builds/releases/download/whisper-b5907/whisper-b5907-linux-x64-cpu.tar.gz",
+              "size": 7442995,
+              "sha256": "c5b15c96ab43e9878093692e4241affc1b0e4276532a9124e87a8a152ab3b946"
+            }
+          ]
+        },
+        {
+          "os": "win32",
+          "arch": "x64",
+          "accel": "cpu",
+          "files": [
+            {
+              "url": "https://github.com/CrealikaCom/engine-builds/releases/download/whisper-b5907/whisper-b5907-win-x64-cpu.zip",
+              "size": 4495410,
+              "sha256": "629db0ed96c79492ebcdfff703f194f0b683fe8e2cfabb5febfbee971cfa0151"
             }
           ]
         }
