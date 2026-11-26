@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('launcher', {
   uninstall: (id) => call('uninstall', id),
   open: (id) => call('open', id),
   stop: (id) => call('stop', id),
+  installEngine: (id, accel) => call('engine-install', id, accel),
+  uninstallEngine: (id) => call('engine-uninstall', id),
   openFolder: (kind) => call('open-folder', kind),
   signIn: () => call('sign-in'),
   cancelSignIn: () => call('sign-in-cancel'),

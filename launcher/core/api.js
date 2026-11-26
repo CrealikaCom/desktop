@@ -1,14 +1,17 @@
 // Local API of the service host process.
 // Listens on 127.0.0.1 only. Two kinds of tokens:
-// - service token: the service backend asks for the session, an access token, paths and the
-//   interface preferences (/v1/...);
+// - service token: the service backend asks for the session, an access token, paths, the
+//   interface preferences and shared engines (/v1/...);
 // - control token: the launcher pings, focuses and stops the service (/control/...).
 import http from 'node:http';
 
 const TOKEN_ERRORS = { signed_out: 401, expired: 401, not_granted: 403, unavailable: 503 };
+const ENGINE_ERRORS = { unknown_engine: 404, not_declared: 403, not_installed: 409, start_failed: 503 };
+const ENGINE_PATH = /^\/v1\/engines\/([a-z][a-z0-9-]{1,31})\/(acquire|release)$/;
 
 export function createLauncherApi({
   getSession, getPaths, getToken = null, getPreferences = null, setPreferences = null, controlToken = null, onControl = null,
+  engines = null,
 }) {
   const tokens = new Map(); // token -> service id
   let server = null;
@@ -44,7 +47,20 @@ export function createLauncherApi({
       }
       return send(res, 405, { error: 'method_not_allowed' });
     }
+    const engineAction = ENGINE_PATH.exec(pathname);
+    if (engineAction && engines) {
+      if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' });
+      const [, engineId, action] = engineAction;
+      try {
+        return send(res, 200, action === 'acquire' ? await engines.acquire(serviceId, engineId) : await engines.release(serviceId, engineId));
+      } catch (err) {
+        const status = ENGINE_ERRORS[err.code];
+        if (!status) throw err;
+        return send(res, status, { error: err.code, message: err.message });
+      }
+    }
     if (req.method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });
+    if (pathname === '/v1/engines' && engines) return send(res, 200, await engines.list(serviceId));
     if (pathname === '/v1/session') return send(res, 200, await getSession(serviceId));
     if (pathname === '/v1/paths') return send(res, 200, await getPaths(serviceId));
     if (pathname === '/v1/token') {

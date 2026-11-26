@@ -5,8 +5,8 @@ Each service is a standalone app with its own window, so you can close the launc
 service keeps running. All services share one home directory, `~/Crealika`, for engines,
 models and results. You can work without signing in, using local models.
 
-Status: early prototype. Installers and shared engines (llama.cpp, stable-diffusion.cpp)
-are planned.
+Status: early prototype. The llama.cpp engine is available; installers and more engines
+(stable-diffusion.cpp, whisper.cpp) are planned.
 
 ## Running from source
 
@@ -68,13 +68,53 @@ Language and theme are shared by the launcher and every service: they are stored
 (`GET`/`PUT /v1/preferences`), and window chrome follows the theme. At sign-in the theme chosen
 in the Crealika account applies once. The interface is English-only for now.
 
+## Shared engines
+
+Engines run models on your computer. The launcher installs them into `<home>/engines/<id>/`
+from pinned prebuilt archives listed in `engines.json`, checking the sha256 of every file, and
+offers the builds for your system: CPU, Vulkan (most GPUs), CUDA (NVIDIA, a large download) and
+Metal (Apple Silicon). The recommended build is Metal on a Mac, else Vulkan when the system has
+the Vulkan loader, else CPU. Installing a service also installs the engines its manifest lists.
+
+| Engine | Server | Models |
+|---|---|---|
+| `llama` | llama.cpp `llama-server` in router mode, OpenAI-compatible API | `.gguf` files in `<home>/models/llm/` |
+
+An engine runs as a separate process shared by all services. A service asks its host for it:
+
+| Request | Answer |
+|---|---|
+| `GET /v1/engines` | `{engines: [{id, name, version, accel, installed, running, declared, models}], external: [...]}` |
+| `POST /v1/engines/<id>/acquire` | `{id, url, apiKey, version, accel, models}`; starts the engine if it is not running |
+| `POST /v1/engines/<id>/release` | `{ok: true}` |
+| errors | 409 `not_installed`, 403 `not_declared` (not in the manifest's `engines`), 404 `unknown_engine`, 503 `start_failed` |
+
+The engine listens on `127.0.0.1` and requires `apiKey` as a bearer token; send the key only to
+that address. It keeps running while any service holds it and stops when the last one releases
+it or exits. If a service crashes, the launcher stops the engines nobody holds anymore. State is
+in `<home>/run/engines/<id>.json`, the log in `<home>/logs/engine-<id>.log`.
+
+`external` lists engines you run yourself that answered on their usual local address: Ollama
+(`127.0.0.1:11434`), LM Studio (`127.0.0.1:1234`) and ComfyUI (`127.0.0.1:8188`). Other
+addresses, and your own engine builds, go into `<home>/config/engines.json`:
+
+```json
+{
+  "external": [ { "kind": "ollama", "url": "http://192.168.1.10:11434" } ],
+  "engines": [ { "id": "llama", "...": "same fields as in engines.json; replaces the built-in entry" } ]
+}
+```
+
+`node scripts/engine-builds.js llama <release tag>` prints the builds of a llama.cpp release
+with their sizes and sha256 digests for `engines.json`.
+
 ## Home directory
 
 ```
 ~/Crealika/
   services/<id>/   installed services
-  engines/         shared engines
-  models/          shared models
+  engines/<id>/    shared engines (crealika-engine.json: version and build)
+  models/          shared models (llm/ for llama.cpp)
   output/<id>/     service results
   data/<id>/       private service data
   cache/  logs/  config/  run/
@@ -93,11 +133,12 @@ launcher/
   app-session.js   Crealika ID session of this process, encrypted with safeStorage
   preload.cjs      launcher window bridge
   ui/              launcher window, served from launcher://app/
+  core/            Electron-free, covered by tests (engine-*.js, engines.js: shared engines)
 vendor/
   crealika-ui-core/  copy of Crealika UI core (scripts/sync-ui-core.js)
-  core/            Electron-free, covered by tests
-catalog.json       built-in catalog
-test/              node --test; fixtures/echo is a test service
+catalog.json       built-in service catalog
+engines.json       built-in engine catalog (scripts/engine-builds.js)
+test/              node --test; fixtures/echo is a test service, fixtures/engine a fake engine
 ```
 
 A sample service lives in the `crealika-desktop-dummy` repository.

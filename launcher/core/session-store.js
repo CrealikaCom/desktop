@@ -4,6 +4,7 @@
 // refresh token, because Crealika ID treats reuse as theft and revokes the sign-in.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { withFileLock } from './file-lock.js';
 
 export class SessionStore {
   constructor({ file, lockFile, encrypt, decrypt, staleLockMs = 60000, lockTimeoutMs = 15000 }) {
@@ -42,34 +43,7 @@ export class SessionStore {
     await fs.rename(tmp, this.file);
   }
 
-  async withLock(fn) {
-    const deadline = Date.now() + this.lockTimeoutMs;
-    for (;;) {
-      try {
-        const handle = await fs.open(this.lockFile, 'wx', 0o600);
-        await handle.writeFile(JSON.stringify({ pid: process.pid, at: Date.now() }));
-        await handle.close();
-        break;
-      } catch (err) {
-        if (err.code !== 'EEXIST') throw err;
-        await this.#breakStaleLock();
-        if (Date.now() > deadline) throw new Error('session lock timeout');
-        await new Promise((resolve) => setTimeout(resolve, 50 + Math.random() * 100));
-      }
-    }
-    try {
-      return await fn();
-    } finally {
-      await fs.rm(this.lockFile, { force: true });
-    }
-  }
-
-  async #breakStaleLock() {
-    try {
-      const { mtimeMs } = await fs.stat(this.lockFile);
-      if (Date.now() - mtimeMs > this.staleLockMs) await fs.rm(this.lockFile, { force: true });
-    } catch {
-      // Lock disappeared meanwhile.
-    }
+  withLock(fn) {
+    return withFileLock(this.lockFile, fn, { staleMs: this.staleLockMs, timeoutMs: this.lockTimeoutMs, what: 'session lock' });
   }
 }

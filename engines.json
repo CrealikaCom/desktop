@@ -1,0 +1,179 @@
+{
+  "engines": [
+    {
+      "id": "llama",
+      "name": "llama.cpp",
+      "description": "Text and vision models in GGUF format behind an OpenAI-compatible API.",
+      "version": "b12751",
+      "server": "llama-server",
+      "models": "llm",
+      "health": "/health",
+      "args": [
+        "--host",
+        "{host}",
+        "--port",
+        "{port}",
+        "--api-key",
+        "{apiKey}",
+        "--models-dir",
+        "{models}"
+      ],
+      "builds": [
+        {
+          "os": "linux",
+          "arch": "x64",
+          "accel": "cpu",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-ubuntu-x64.tar.gz",
+              "size": 23405425,
+              "sha256": "d0f565208f8b28b1129e95d723a05e58a6ec97c87f7ca933df8023fa60a274ea"
+            }
+          ]
+        },
+        {
+          "os": "linux",
+          "arch": "x64",
+          "accel": "vulkan",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-ubuntu-vulkan-x64.tar.gz",
+              "size": 37118008,
+              "sha256": "745deaf290a43e5875441ec7fa2c2b16a3a773d059b4f3123df754752855c29c"
+            }
+          ]
+        },
+        {
+          "os": "linux",
+          "arch": "x64",
+          "accel": "cuda",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-ubuntu-cuda-12.8-x64.tar.gz",
+              "size": 220581006,
+              "sha256": "87ce21fe2e53963db6ba65459d96863449c88af4b6eddbeb69530c22ee5582e1"
+            },
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/cudart-llama-b12751-bin-ubuntu-cuda-12.8-x64.tar.gz",
+              "size": 594377003,
+              "sha256": "b5befd2ee37a29c695f9339cb6422e47fd4010110422f86853af238fe6d03c9c"
+            }
+          ]
+        },
+        {
+          "os": "linux",
+          "arch": "arm64",
+          "accel": "cpu",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-ubuntu-arm64.tar.gz",
+              "size": 18957598,
+              "sha256": "b4fa436c8d97a9124df5630a9edba92cdbbe5767e382ea689ffaf4f3610bf187"
+            }
+          ]
+        },
+        {
+          "os": "linux",
+          "arch": "arm64",
+          "accel": "vulkan",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-ubuntu-vulkan-arm64.tar.gz",
+              "size": 30082365,
+              "sha256": "d135683852bddb8fbb45ae08d1e75cdb78c8604303f7e769abf3fe6c0368f69f"
+            }
+          ]
+        },
+        {
+          "os": "win32",
+          "arch": "x64",
+          "accel": "cpu",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-win-cpu-x64.zip",
+              "size": 25238820,
+              "sha256": "09c916f56fb8ba4758fcfb6ce4e88eb628180c8214342556d1dab27cef730b85"
+            }
+          ]
+        },
+        {
+          "os": "win32",
+          "arch": "x64",
+          "accel": "vulkan",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-win-vulkan-x64.zip",
+              "size": 39109267,
+              "sha256": "8c2d96e321398ae3579de5d09358b187b74273e64f7815c075b995c0a6091e3c"
+            }
+          ]
+        },
+        {
+          "os": "win32",
+          "arch": "x64",
+          "accel": "cuda",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-win-cuda-12.4-x64.zip",
+              "size": 358616082,
+              "sha256": "2e5d68a9537cb3c8a1e84656c26a64bae6d4e0c01b881d880f2628aa17baa5fa"
+            },
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/cudart-llama-bin-win-cuda-12.4-x64.zip",
+              "size": 391443627,
+              "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6"
+            }
+          ]
+        },
+        {
+          "os": "win32",
+          "arch": "arm64",
+          "accel": "cpu",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-win-cpu-arm64.zip",
+              "size": 13305403,
+              "sha256": "1a6e0769fc9cc8cac45a4002666577e4975625789a5c1dee169484d98d208820"
+            }
+          ]
+        },
+        {
+          "os": "win32",
+          "arch": "arm64",
+          "accel": "vulkan",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-win-vulkan-arm64.zip",
+              "size": 26740529,
+              "sha256": "2a5df602a37c6f0d9b3a84274430e1277fc4323309e2c31e425e3fd12da9854f"
+            }
+          ]
+        },
+        {
+          "os": "darwin",
+          "arch": "arm64",
+          "accel": "metal",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-macos-arm64.tar.gz",
+              "size": 16840406,
+              "sha256": "d6b2790ee9a8f528016976d8f23c0fcbd6310dd739538d0c00088805ef52a490"
+            }
+          ]
+        },
+        {
+          "os": "darwin",
+          "arch": "x64",
+          "accel": "cpu",
+          "files": [
+            {
+              "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12751/llama-b12751-bin-macos-x64.tar.gz",
+              "size": 12568191,
+              "sha256": "80985ebbe0ac3029afb45b9442d1c9aa3cd8ac08b3b22b15f234e5360772377b"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

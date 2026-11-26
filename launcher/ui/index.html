@@ -20,12 +20,20 @@
     <p id="error" class="launcher-error" role="alert" hidden></p>
     <div id="notice" class="launcher-notice" hidden></div>
     <ul id="services" class="launcher-services"></ul>
+
+    <div class="launcher-head launcher-section">
+      <h1>Engines</h1>
+      <p class="launcher-lead">Shared engines run models on this computer. Services start them when needed, and they stop when the last service using them closes.</p>
+    </div>
+    <ul id="engines" class="launcher-services"></ul>
+    <p id="external" class="launcher-status" hidden></p>
   </main>
   <footer class="cr-page launcher-footer">
     <span>Home: <code id="home"></code></span>
     <nav class="launcher-folders" aria-label="Folders">
       <button class="cr-button" data-folder="home">Open</button>
       <button class="cr-button" data-folder="models">models</button>
+      <button class="cr-button" data-folder="engines">engines</button>
       <button class="cr-button" data-folder="output">output</button>
       <button class="cr-button" data-folder="logs">logs</button>
       <button class="cr-button" data-folder="config">config</button>

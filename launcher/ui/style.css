@@ -45,6 +45,9 @@ body {
 .launcher-status { color: var(--cr-text-muted); }
 .launcher-source { color: var(--cr-text-muted); font-size: 13px; word-break: break-all; }
 .launcher-actions { display: flex; flex: none; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.launcher-section { margin-top: 36px; }
+.launcher-actions select { min-width: 150px; }
+.launcher-progress { width: 100%; max-width: 320px; height: 6px; margin-top: 8px; accent-color: var(--cr-accent); }
 
 .launcher-footer {
   display: flex;

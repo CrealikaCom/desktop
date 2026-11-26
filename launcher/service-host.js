@@ -1,12 +1,14 @@
 // Service host: the same executable started with --service=<id>. A standalone app with
 // its own window that keeps running without the launcher. It starts the service backend,
 // opens its window, writes run/<id>.json and answers control requests from the launcher.
+// Shared engines the service asks for are started through this host and released when it exits.
 // Closing the window shuts the service down.
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { app, BrowserWindow, dialog, nativeTheme, shell } from 'electron';
 import { createAppSession } from './app-session.js';
 import { createLauncherApi } from './core/api.js';
+import { createHostEngines } from './core/engines.js';
 import { ensureHome, resolveHome } from './core/home.js';
 import { readManifest } from './core/manifest.js';
 import { createPreferences, themeSource } from './core/preferences.js';
@@ -23,7 +25,7 @@ export function runServiceHost(id) {
     return;
   }
 
-  let lay, api, runner, win;
+  let lay, api, runner, win, engines;
   let quitting = false;
 
   const focus = () => {
@@ -35,6 +37,8 @@ export function runServiceHost(id) {
 
   async function shutdown() {
     await Promise.allSettled([runner?.stopAll()]);
+    // Shared engines this service used stop once no other service holds them.
+    await engines?.releaseAll().catch(() => {});
     if (lay) await removeRun(lay, id, process.pid).catch(() => {});
     await api?.close();
   }
@@ -53,6 +57,7 @@ export function runServiceHost(id) {
     lay = await ensureHome(resolveHome());
     const manifest = await readManifest(path.join(lay.services, id));
     const controlToken = randomBytes(32).toString('base64url');
+    engines = createHostEngines({ lay, manifest });
     // The launcher signs in; every host reads the same shared session.
     const { session } = createAppSession(lay);
     // Interface preferences are shared too; window chrome (scrollbars, menus) follows the theme.
@@ -79,6 +84,7 @@ export function runServiceHost(id) {
         output: path.join(lay.output, sid),
         data: path.join(lay.data, sid),
       }),
+      engines,
       controlToken,
       onControl: (action) => {
         if (action === 'focus') focus();

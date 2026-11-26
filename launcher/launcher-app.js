@@ -1,5 +1,6 @@
-// Launcher window: catalog, installation and starting of services. Services are separate
-// processes (service-host.js) not owned by the launcher: closing it leaves them running.
+// Launcher window: catalog, installation and starting of services, and the shared engines they
+// use. Services are separate processes (service-host.js) not owned by the launcher: closing it
+// leaves them running.
 import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -7,6 +8,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { app, BrowserWindow, ipcMain, nativeTheme, net, protocol, shell } from 'electron';
 import { createAppSession } from './app-session.js';
 import { loadCatalogs } from './core/catalog.js';
+import { buildsFor, currentPlatform, loadEngineCatalogs, recommendedBuild, detectAccelerators } from './core/engine-catalog.js';
+import { installEngine, uninstallEngine } from './core/engine-installer.js';
+import { listRunningEngines, reapEngines } from './core/engine-runner.js';
+import { engineCatalogFiles, engineOverview } from './core/engines.js';
+import { findExternalEngines } from './core/external-engines.js';
 import { ensureHome, resolveHome } from './core/home.js';
 import { install, listInstalled, uninstall } from './core/installer.js';
 import { SignInError, signInWithBrowser } from './core/crealika-id.js';
@@ -39,7 +45,8 @@ export function runLauncher() {
   // One browser sign-in at a time: { url, abort } while waiting for the browser.
   let signIn = null;
   let signInError = null;
-  const busy = new Set(); // ids of services being installed, removed or started
+  const busy = new Set(); // ids of services being installed, removed or started; engine:<id> for engines
+  const progress = new Map(); // engine id -> { received, total } while downloading
 
   const catalogFiles = () => [path.join(appRoot, 'catalog.json'), path.join(lay.config, 'catalog.json')];
 
@@ -48,6 +55,7 @@ export function runLauncher() {
     const installed = await listInstalled(lay);
     const running = await listRunning(lay);
     const ids = new Set([...catalog.map((c) => c.id), ...installed.keys()]);
+    const overview = await engineOverview(lay, { external: false });
     return {
       home: lay.home,
       session: await auth.session.state(),
@@ -66,9 +74,23 @@ export function runLauncher() {
           installed: m ? (m.broken ? { broken: m.broken } : { version: m.version }) : null,
           running: running.has(id),
           busy: busy.has(id),
+          engines: m && !m.broken ? m.engines : [],
         };
       }),
+      detected: overview.detected,
+      engines: overview.engines.map((e) => ({ ...e, busy: busy.has(`engine:${e.id}`), progress: progress.get(e.id) ?? null })),
+      external: await externalEngines(),
     };
+  }
+
+  // Engines the user runs themselves, probed at most every 10 seconds.
+  let externalCache = { at: 0, list: [] };
+  async function externalEngines() {
+    if (Date.now() - externalCache.at > 10000) {
+      const { external } = await loadEngineCatalogs(engineCatalogFiles(lay));
+      externalCache = { at: Date.now(), list: await findExternalEngines(external) };
+    }
+    return externalCache.list;
   }
 
   function notify() {
@@ -84,6 +106,43 @@ export function runLauncher() {
     } finally {
       busy.delete(id);
       notify();
+    }
+  }
+
+  // Installs or replaces a shared engine; accel null picks the recommended build for this computer.
+  async function installEngineBuild(id, accel) {
+    const { engines } = await loadEngineCatalogs(engineCatalogFiles(lay));
+    const engine = engines.find((e) => e.id === id);
+    if (!engine) throw new Error(`engine ${id} is not in the engine catalog`);
+    const builds = buildsFor(engine, currentPlatform());
+    const build = accel ? builds.find((b) => b.accel === accel) : recommendedBuild(builds, await detectAccelerators());
+    if (!build) throw new Error(`${engine.name}: no ${accel ? `${accel} ` : ''}build for ${process.platform} ${process.arch}`);
+    return withBusy(`engine:${id}`, async () => {
+      if ((await listRunningEngines(lay)).has(id)) throw new Error(`${engine.name} is in use; close the services using it first`);
+      let last = 0;
+      try {
+        return await installEngine(engine, build, lay, {
+          onProgress: (p) => {
+            progress.set(id, p);
+            if (Date.now() - last > 300) {
+              last = Date.now();
+              notify();
+            }
+          },
+        });
+      } finally {
+        progress.delete(id);
+      }
+    });
+  }
+
+  // A service brings the engines its manifest lists.
+  async function installServiceEngines(manifest) {
+    const { engines } = await loadEngineCatalogs(engineCatalogFiles(lay));
+    const missing = manifest.engines.filter((id) => !engines.some((e) => e.id === id));
+    if (missing.length) throw new Error(`${manifest.name} needs ${missing.join(', ')}, which the engine catalog does not have`);
+    for (const id of manifest.engines) {
+      if (!(await engineOverview(lay, { external: false })).engines.find((e) => e.id === id)?.installed) await installEngineBuild(id, null);
     }
   }
 
@@ -225,11 +284,20 @@ export function runLauncher() {
     handle('install', async (id) => {
       const entry = (await loadCatalogs(catalogFiles())).find((c) => c.id === id);
       if (!entry) throw new Error(`${id}: not in the catalog`);
-      return withBusy(id, async () => {
+      const manifest = await withBusy(id, async () => {
         await assertStopped(id);
         return install(entry, lay);
       });
+      await installServiceEngines(manifest);
+      return manifest;
     });
+    handle('engine-install', (id, accel) => installEngineBuild(id, accel ?? null));
+    handle('engine-uninstall', (id) =>
+      withBusy(`engine:${id}`, async () => {
+        if ((await listRunningEngines(lay)).has(id)) throw new Error('The engine is in use; close the services using it first');
+        return uninstallEngine(id, lay);
+      }),
+    );
     handle('uninstall', (id) =>
       withBusy(id, async () => {
         await assertStopped(id);
@@ -248,7 +316,7 @@ export function runLauncher() {
     });
     handle('stop', stopService);
     handle('open-folder', (kind) => {
-      if (!['home', 'models', 'output', 'logs', 'config', 'services'].includes(kind)) throw new Error('unknown folder');
+      if (!['home', 'models', 'output', 'logs', 'config', 'services', 'engines'].includes(kind)) throw new Error('unknown folder');
       return shell.openPath(lay[kind]);
     });
 
@@ -268,8 +336,12 @@ export function runLauncher() {
     mainWindow.on('closed', () => {
       mainWindow = null;
     });
-    // Services start and stop on their own, so the launcher window refreshes on a timer.
-    const timer = setInterval(notify, POLL_MS);
+    // Services start and stop on their own, so the launcher window refreshes on a timer. Engines
+    // left by services that crashed are stopped on the same timer.
+    const timer = setInterval(() => {
+      reapEngines(lay).catch(() => {});
+      notify();
+    }, POLL_MS);
     mainWindow.on('closed', () => clearInterval(timer));
     await mainWindow.loadURL('launcher://app/index.html');
   }
