@@ -4,6 +4,9 @@ import { applyTheme, mountAppHeader } from '/crealika-ui-core/crealika-ui.js';
 const api = window.launcher;
 const $ = (id) => document.getElementById(id);
 let state = null;
+// Card highlighted after a service window asked to show it: { id, until }.
+let highlight = null;
+const HIGHLIGHT_MS = 4000;
 
 function el(tag, props = {}, children = []) {
   const node = Object.assign(document.createElement(tag), props);
@@ -63,7 +66,8 @@ function serviceCard(s) {
     if (s.source) actions.push(button(s.installed ? 'Reinstall' : 'Install', () => api.install(s.id), { primary: !s.installed, disabled: s.running }));
     if (s.installed) actions.push(button('Uninstall', () => api.uninstall(s.id), { disabled: s.running }));
   }
-  return el('li', { className: 'launcher-card' }, [
+  const lit = highlight?.id === s.id && Date.now() < highlight.until;
+  return el('li', { className: `launcher-card${lit ? ' is-highlighted' : ''}`, id: `service-${s.id}` }, [
     el('div', { className: 'launcher-card-info' }, [
       el('h2', { textContent: s.name }),
       s.description ? el('p', { textContent: s.description }) : null,
@@ -185,5 +189,17 @@ async function render() {
 for (const b of document.querySelectorAll('[data-folder]')) {
   b.addEventListener('click', () => act(() => api.openFolder(b.dataset.folder)));
 }
+async function showRequested() {
+  const id = await api.takeShow();
+  if (!id) return;
+  highlight = { id, until: Date.now() + HIGHLIGHT_MS };
+  await render();
+  $(`service-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  setTimeout(() => render().catch(showError), HIGHLIGHT_MS);
+}
+
 api.onChange(() => render().catch(showError));
-render().catch(showError);
+api.onShow(() => showRequested().catch(showError));
+render()
+  .then(showRequested)
+  .catch(showError);

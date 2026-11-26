@@ -2,9 +2,11 @@
 // its own window that keeps running without the launcher. It starts the service backend,
 // opens its window, writes run/<id>.json and answers control requests from the launcher.
 // Shared engines the service asks for are started through this host and released when it exits.
+// The service window can switch to other services: this host focuses or starts them.
 // Closing the window shuts the service down.
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, dialog, nativeTheme, shell } from 'electron';
 import { createAppSession } from './app-session.js';
 import { createLauncherApi } from './core/api.js';
@@ -14,6 +16,10 @@ import { readManifest } from './core/manifest.js';
 import { createPreferences, themeSource } from './core/preferences.js';
 import { removeRun, writeRun } from './core/registry.js';
 import { ServiceRunner } from './core/runner.js';
+import { catalogFiles, listServices, openService } from './core/services.js';
+import { startApp } from './start-app.js';
+
+const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export function runServiceHost(id) {
   // Own userData: a separate single-instance lock per service,
@@ -85,6 +91,10 @@ export function runServiceHost(id) {
         data: path.join(lay.data, sid),
       }),
       engines,
+      services: {
+        list: () => listServices(lay, catalogFiles(lay, appRoot), id),
+        open: (_sid, target) => openService(lay, catalogFiles(lay, appRoot), target, (what) => startApp(lay, what)),
+      },
       controlToken,
       onControl: (action) => {
         if (action === 'focus') focus();

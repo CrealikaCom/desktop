@@ -17,6 +17,7 @@ npm ci        # Electron is downloaded on first start
 npm test      # launcher core, no Electron and no network
 npm start     # the launcher; home directory is ~/Crealika or $CREALIKA_HOME
 npm start -- --service=<id>   # an installed service without the launcher
+npm start -- --show=<id>      # the launcher with that service's card highlighted
 ```
 
 The built-in service catalog is empty for now. To install a service from your own checkout,
@@ -134,13 +135,23 @@ version with their sizes and sha256 digests for `engines.json`.
 `config/crealika-id.session` and `config/crealika-id.lock` hold the shared sign-in;
 `config/preferences.json` holds the language and theme.
 
-## Layout
+## Switching between services
+
+A service window can switch to the other services from its header, like the Crealika website.
+The host lists them and opens one the way the launcher's Open button does:
+
+| Request | Answer |
+|---|---|
+| `GET /v1/services` | `{services: [{id, name, description, installed, running, current}]}`: the catalog and installed services, by name |
+| `POST /v1/services/<id>/open` | `{result}`: `focused` (it was running), `started`, or `launcher` (not installed: the launcher opens on its card); 404 `unknown_service` |
+
 
 ```
 launcher/
-  main.js          entry point: the launcher, or --service=<id>
+  main.js          entry point: the launcher (--show=<id>), or --service=<id>
   launcher-app.js  launcher window: catalog, install, start and stop services
   service-host.js  service process: backend, window, registry, control
+  start-app.js     starts another detached process of this executable
   app-session.js   Crealika ID session of this process, encrypted with safeStorage
   preload.cjs      launcher window bridge
   ui/              launcher window, served from launcher://app/

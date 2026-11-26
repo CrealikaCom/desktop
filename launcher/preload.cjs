@@ -22,4 +22,7 @@ contextBridge.exposeInMainWorld('launcher', {
   signOut: () => call('sign-out'),
   setPreferences: (update) => call('set-preferences', update),
   onChange: (fn) => ipcRenderer.on('state-changed', () => fn()),
+  // The id of a service another window asked to show, once; null when there is none.
+  takeShow: () => call('take-show'),
+  onShow: (fn) => ipcRenderer.on('show-service', () => fn()),
 });

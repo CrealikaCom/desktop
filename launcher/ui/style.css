@@ -39,6 +39,8 @@ body {
   border-radius: var(--cr-radius-panel);
   background: var(--cr-surface);
 }
+.launcher-card { transition: border-color 0.3s, box-shadow 0.3s; }
+.launcher-card.is-highlighted { border-color: var(--cr-accent); box-shadow: 0 0 0 2px var(--cr-accent); }
 .launcher-card-info { min-width: 0; }
 .launcher-card h2 { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
 .launcher-card p { margin: 2px 0; }

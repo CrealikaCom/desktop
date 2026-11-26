@@ -1,7 +1,7 @@
 // Local API of the service host process.
 // Listens on 127.0.0.1 only. Two kinds of tokens:
 // - service token: the service backend asks for the session, an access token, paths, the
-//   interface preferences and shared engines (/v1/...);
+//   interface preferences, shared engines and the services to switch to (/v1/...);
 // - control token: the launcher pings, focuses and stops the service (/control/...).
 import http from 'node:http';
 
@@ -10,10 +10,11 @@ const ENGINE_ERRORS = {
   unknown_engine: 404, not_declared: 403, not_installed: 409, start_failed: 503, model_required: 400, model_not_found: 404,
 };
 const ENGINE_PATH = /^\/v1\/engines\/([a-z][a-z0-9-]{1,31})\/(acquire|release)$/;
+const OPEN_PATH = /^\/v1\/services\/([^/]+)\/open$/;
 
 export function createLauncherApi({
   getSession, getPaths, getToken = null, getPreferences = null, setPreferences = null, controlToken = null, onControl = null,
-  engines = null,
+  engines = null, services = null,
 }) {
   const tokens = new Map(); // token -> service id
   let server = null;
@@ -69,7 +70,18 @@ export function createLauncherApi({
         return send(res, status, { error: err.code, message: err.message });
       }
     }
+    const open = OPEN_PATH.exec(pathname);
+    if (open && services) {
+      if (req.method !== 'POST') return send(res, 405, { error: 'method_not_allowed' });
+      try {
+        return send(res, 200, { result: await services.open(serviceId, open[1]) });
+      } catch (err) {
+        if (err.code !== 'unknown_service') throw err;
+        return send(res, 404, { error: err.code, message: err.message });
+      }
+    }
     if (req.method !== 'GET') return send(res, 405, { error: 'method_not_allowed' });
+    if (pathname === '/v1/services' && services) return send(res, 200, { services: await services.list(serviceId) });
     if (pathname === '/v1/engines' && engines) return send(res, 200, await engines.list(serviceId));
     if (pathname === '/v1/session') return send(res, 200, await getSession(serviceId));
     if (pathname === '/v1/paths') return send(res, 200, await getPaths(serviceId));

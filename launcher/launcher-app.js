@@ -1,7 +1,6 @@
 // Launcher window: catalog, installation and starting of services, and the shared engines they
 // use. Services are separate processes (service-host.js) not owned by the launcher: closing it
 // leaves them running.
-import { spawn } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -18,6 +17,9 @@ import { install, listInstalled, uninstall } from './core/installer.js';
 import { SignInError, signInWithBrowser } from './core/crealika-id.js';
 import { createPreferences, themeSource } from './core/preferences.js';
 import { control, listRunning, readRun } from './core/registry.js';
+import { parseShowArg } from './core/args.js';
+import { catalogFiles as serviceCatalogFiles } from './core/services.js';
+import { startApp } from './start-app.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(here, '..');
@@ -48,7 +50,9 @@ export function runLauncher() {
   const busy = new Set(); // ids of services being installed, removed or started; engine:<id> for engines
   const progress = new Map(); // engine id -> { received, total } while downloading
 
-  const catalogFiles = () => [path.join(appRoot, 'catalog.json'), path.join(lay.config, 'catalog.json')];
+  const catalogFiles = () => serviceCatalogFiles(lay, appRoot);
+  // A service window asked to show this service (--show=<id>): its card is highlighted.
+  let show = parseShowArg(process.argv);
 
   async function state() {
     const catalog = await loadCatalogs(catalogFiles());
@@ -155,11 +159,7 @@ export function runLauncher() {
     const run = await readRun(lay, id);
     if (run && (await control(run, 'focus'))) return;
     await withBusy(id, async () => {
-      const args = app.isPackaged ? [`--service=${id}`] : [app.getAppPath(), `--service=${id}`];
-      const env = { ...process.env, CREALIKA_HOME: lay.home };
-      delete env.ELECTRON_RUN_AS_NODE;
-      const child = spawn(process.execPath, args, { detached: true, stdio: 'ignore', env, windowsHide: false });
-      child.unref();
+      const child = startApp(lay, { service: id });
       // Wait for the host to register itself; the host reports startup errors on its own.
       const deadline = Date.now() + 30000;
       while (Date.now() < deadline) {
@@ -267,10 +267,16 @@ export function runLauncher() {
     });
   }
 
-  function showWindow() {
+  function showWindow(_e, argv = []) {
     if (!mainWindow) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
     mainWindow.focus();
+    const id = parseShowArg(argv);
+    if (id) {
+      show = id;
+      mainWindow.webContents.send('show-service');
+    }
   }
 
   async function main() {
@@ -281,6 +287,11 @@ export function runLauncher() {
     protocol.handle('launcher', serveUi);
 
     handle('state', state);
+    handle('take-show', () => {
+      const id = show;
+      show = null;
+      return id;
+    });
     handle('install', async (id) => {
       const entry = (await loadCatalogs(catalogFiles())).find((c) => c.id === id);
       if (!entry) throw new Error(`${id}: not in the catalog`);
