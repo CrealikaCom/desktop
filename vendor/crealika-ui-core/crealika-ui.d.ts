@@ -64,6 +64,8 @@ export interface SwitcherItem {
   status?: "live" | "beta" | "soon";
   /** Icon name for icon(); defaults to the item id. */
   icon?: string;
+  /** false: labels the switcher button when current, but is not shown in the list. */
+  listed?: boolean;
 }
 
 export interface NavItem {

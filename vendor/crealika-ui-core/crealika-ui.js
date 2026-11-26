@@ -9,7 +9,7 @@
 import { LOCALE_NAMES, STRINGS } from './i18n.js';
 
 export { LOCALE_NAMES };
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 export const STORAGE_KEY = 'crealika.preferences';
 export const LOCALES = Object.freeze(Object.keys(STRINGS));
 
@@ -632,6 +632,7 @@ const ICONS = {
   vino: '<rect x="8.5" y="3" width="7" height="5" rx="1.2"/><rect x="2.5" y="16" width="7" height="5" rx="1.2"/><rect x="14.5" y="16" width="7" height="5" rx="1.2"/><path d="M12 8v4M6 16v-4h12v4"/>',
   media: '<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2.5h6.5A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>',
   video: '<rect x="3" y="5" width="13" height="14" rx="3"/><path d="m16 10 5-3v10l-5-3"/>',
+  careers: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3 12.5h18M10.5 12.5v1.5h3v-1.5"/>',
   grid: '<rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.8"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1.8"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1.8"/><rect x="14" y="14" width="6.5" height="6.5" rx="1.8"/>',
   sun: '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
@@ -712,7 +713,7 @@ function menuKeys(menu, close) {
  *
  * @typedef {string|Record<string,string>|((locale: string) => string)} Label
  * @typedef {{id: string, name: Label, summary?: Label, href?: string|null, onSelect?: () => void,
- *   status?: 'live'|'beta'|'soon', icon?: string}} SwitcherItem
+ *   status?: 'live'|'beta'|'soon', icon?: string, listed?: boolean}} SwitcherItem
  * @param {{
  *   locale: string,
  *   locales?: string[],
@@ -735,7 +736,8 @@ function menuKeys(menu, close) {
  *   account: undefined while sign-in is being checked, null for a guest, an object for a signed-in user.
  *   switcher: with `current` the button shows that item's name and is visible to guests too; without
  *   it the button reads "Services" and is shown to signed-in users only (override with `guests`).
- *   An item without href and onSelect is shown as unavailable. title is shown when the switcher has
+ *   An item without href and onSelect is shown as unavailable; an item with listed: false labels the
+ *   button when it is current but stays out of the list. title is shown when the switcher has
  *   no current item. locales limits the offered languages (one language hides the language controls).
  *   preferences.store keeps every committed choice (guest toggles and applied settings) where the
  *   app keeps it. navAlign: 'center' centres the page navigation.
@@ -748,6 +750,7 @@ export function mountAppHeader(options) {
   const homeUrl = options.homeUrl ?? '/';
   const switcherItems = options.switcher?.items ?? [];
   const current = switcherItems.find((item) => item.id === options.switcher?.current);
+  const listedItems = switcherItems.filter((item) => item.listed !== false);
   const switcherForGuests = options.switcher?.guests ?? Boolean(current);
   const nav = options.nav ?? [];
   const popovers = new Set();
@@ -962,7 +965,7 @@ export function mountAppHeader(options) {
     switcherButton.querySelector('.cr-switcher-label').textContent = label;
     switcherButton.setAttribute('aria-label', current ? `${label} — ${text(locale, 'services')}` : label);
     switcherNav.setAttribute('aria-label', text(locale, 'servicesNav'));
-    switcherList.replaceChildren(...switcherItems.map((item) => {
+    switcherList.replaceChildren(...listedItems.map((item) => {
       const status = item.status ?? 'live';
       const badge = status === 'live' ? null : element('span', { class: `cr-switcher-badge is-${status}` }, text(locale, status));
       const iconNode = element('span', { class: 'cr-switcher-icon' });

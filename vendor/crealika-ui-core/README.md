@@ -64,6 +64,9 @@ const header = mountAppHeader({
 });
 ```
 
+- `switcher` items link (`href`), run `onSelect`, or show as unavailable (`status: 'soon'` or
+  neither). An item with `listed: false` labels the button when it is `current` but stays out of the
+  list (a page outside the app line-up); `icon` names an `icon()` glyph, by default the item id.
 - `account`: `undefined` while sign-in is being checked, `null` for a guest, an object when signed in.
   Guests get a theme toggle, a language menu and "Sign in"; signed-in users get the account menu.
 - `locales` limits the offered languages; with one language the language controls are hidden.
@@ -107,4 +110,9 @@ npm run demo    # http://localhost:4400: ?guest=1, ?current=<id> (empty for none
 
 ## License
 
-Not chosen yet. The Onest font is distributed under the SIL Open Font License (`fonts/OFL.txt`).
+Apache License, Version 2.0: see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+The Onest font in `fonts/` is distributed under the SIL Open Font License, Version 1.1
+(`fonts/OFL.txt`). The Crealika name and the logo files in `brand/` are not covered by the
+Apache License; see [TRADEMARKS.md](TRADEMARKS.md) for what you may do with them. A fork
+replaces the files in `brand/`.

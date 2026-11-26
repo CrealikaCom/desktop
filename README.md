@@ -104,4 +104,9 @@ A sample service lives in the `crealika-desktop-dummy` repository.
 
 ## License
 
-Not chosen yet.
+Apache License, Version 2.0: see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+`vendor/crealika-ui-core/` is a copy of Crealika UI core under the same license, with the Onest
+font under the SIL Open Font License. The Crealika name and the logo files in
+`vendor/crealika-ui-core/brand/` are not covered by the Apache License; see
+[TRADEMARKS.md](TRADEMARKS.md). A fork replaces them.
