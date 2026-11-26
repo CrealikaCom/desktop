@@ -113,3 +113,17 @@ test('host API: GET /v1/services and POST /v1/services/<id>/open', async () => {
     await api.close();
   }
 });
+
+test('Linux windows run under XWayland when it is there, with ANGLE on Vulkan for NVIDIA', async () => {
+  const { displaySwitches } = await import('../launcher/core/display.js');
+  const env = { WAYLAND_DISPLAY: 'wayland-0', DISPLAY: ':0' };
+  const argv = ['electron', '.'];
+  assert.deepEqual(displaySwitches({ platform: 'linux', env, argv }), [['ozone-platform', 'x11']]);
+  assert.deepEqual(displaySwitches({ platform: 'linux', env, argv, nvidia: true }), [['ozone-platform', 'x11'], ['use-angle', 'vulkan']]);
+  assert.deepEqual(displaySwitches({ platform: 'linux', env, argv: [...argv, '--use-angle=gl'], nvidia: true }), [['ozone-platform', 'x11']]);
+  assert.deepEqual(displaySwitches({ platform: 'linux', env, argv: [...argv, '--ozone-platform=wayland'] }), []);
+  assert.deepEqual(displaySwitches({ platform: 'linux', env: { ...env, CREALIKA_DESKTOP_WAYLAND: '1' }, argv }), []);
+  assert.deepEqual(displaySwitches({ platform: 'linux', env: { WAYLAND_DISPLAY: 'wayland-0' }, argv }), [], 'no XWayland');
+  assert.deepEqual(displaySwitches({ platform: 'linux', env: { DISPLAY: ':0' }, argv }), [], 'an X11 session needs nothing');
+  assert.deepEqual(displaySwitches({ platform: 'win32', env, argv }), []);
+});
