@@ -4,15 +4,22 @@
 // available the launcher and the service hosts run as X11 clients, where they can.
 // Under XWayland the NVIDIA driver crashes Chromium's default GL path (the windows fall back to
 // software rendering), so there the GPU is used through ANGLE on Vulkan.
-// CREALIKA_DESKTOP_WAYLAND=1 keeps native Wayland; switches given on the command line win.
-// Returns Chromium switches as [name, value] pairs.
-export function displaySwitches({
-  platform = process.platform, env = process.env, argv = process.argv, nvidia = false,
+// The platform must be on the command line when the process starts: added later from main.js
+// it leaves the process without a window. CREALIKA_DESKTOP_WAYLAND=1 keeps native Wayland;
+// switches already on the command line win.
+import { existsSync } from 'node:fs';
+
+// Switches that choose how windows are drawn; processes started by the app copy them.
+export const DISPLAY_SWITCH = /^--(ozone-platform|use-angle|use-gl)=/;
+
+// Command-line switches this process should have been started with, and is missing.
+export function displayArgs({
+  platform = process.platform, env = process.env, argv = process.argv, nvidia = existsSync('/proc/driver/nvidia/version'),
 } = {}) {
   if (platform !== 'linux' || env.CREALIKA_DESKTOP_WAYLAND === '1') return [];
   const given = (name) => argv.some((a) => a === `--${name}` || a.startsWith(`--${name}=`));
   if (given('ozone-platform') || !env.WAYLAND_DISPLAY || !env.DISPLAY) return [];
-  const out = [['ozone-platform', 'x11']];
-  if (nvidia && !given('use-angle') && !given('use-gl')) out.push(['use-angle', 'vulkan']);
+  const out = ['--ozone-platform=x11'];
+  if (nvidia && !given('use-angle') && !given('use-gl')) out.push('--use-angle=vulkan');
   return out;
 }

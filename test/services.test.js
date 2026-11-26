@@ -115,15 +115,17 @@ test('host API: GET /v1/services and POST /v1/services/<id>/open', async () => {
 });
 
 test('Linux windows run under XWayland when it is there, with ANGLE on Vulkan for NVIDIA', async () => {
-  const { displaySwitches } = await import('../launcher/core/display.js');
+  const { displayArgs } = await import('../launcher/core/display.js');
   const env = { WAYLAND_DISPLAY: 'wayland-0', DISPLAY: ':0' };
   const argv = ['electron', '.'];
-  assert.deepEqual(displaySwitches({ platform: 'linux', env, argv }), [['ozone-platform', 'x11']]);
-  assert.deepEqual(displaySwitches({ platform: 'linux', env, argv, nvidia: true }), [['ozone-platform', 'x11'], ['use-angle', 'vulkan']]);
-  assert.deepEqual(displaySwitches({ platform: 'linux', env, argv: [...argv, '--use-angle=gl'], nvidia: true }), [['ozone-platform', 'x11']]);
-  assert.deepEqual(displaySwitches({ platform: 'linux', env, argv: [...argv, '--ozone-platform=wayland'] }), []);
-  assert.deepEqual(displaySwitches({ platform: 'linux', env: { ...env, CREALIKA_DESKTOP_WAYLAND: '1' }, argv }), []);
-  assert.deepEqual(displaySwitches({ platform: 'linux', env: { WAYLAND_DISPLAY: 'wayland-0' }, argv }), [], 'no XWayland');
-  assert.deepEqual(displaySwitches({ platform: 'linux', env: { DISPLAY: ':0' }, argv }), [], 'an X11 session needs nothing');
-  assert.deepEqual(displaySwitches({ platform: 'win32', env, argv }), []);
+  const linux = (over) => displayArgs({ platform: 'linux', env, argv, nvidia: false, ...over });
+  assert.deepEqual(linux(), ['--ozone-platform=x11']);
+  assert.deepEqual(linux({ nvidia: true }), ['--ozone-platform=x11', '--use-angle=vulkan']);
+  assert.deepEqual(linux({ nvidia: true, argv: [...argv, '--use-angle=gl'] }), ['--ozone-platform=x11']);
+  assert.deepEqual(linux({ nvidia: true, argv: [...argv, '--ozone-platform=x11', '--use-angle=vulkan'] }), [], 'started with them: nothing to add');
+  assert.deepEqual(linux({ argv: [...argv, '--ozone-platform=wayland'] }), []);
+  assert.deepEqual(linux({ env: { ...env, CREALIKA_DESKTOP_WAYLAND: '1' } }), []);
+  assert.deepEqual(linux({ env: { WAYLAND_DISPLAY: 'wayland-0' } }), [], 'no XWayland');
+  assert.deepEqual(linux({ env: { DISPLAY: ':0' } }), [], 'an X11 session needs nothing');
+  assert.deepEqual(displayArgs({ platform: 'win32', env, argv }), []);
 });
