@@ -1,3 +1,15 @@
 {
-  "services": []
+  "services": [
+    {
+      "id": "images",
+      "name": "Images",
+      "description": "Image generation on this computer with Z-Image and MOSS-Image, with a Turbo mode.",
+      "version": "0.1.0",
+      "source": {
+        "type": "archive",
+        "url": "https://github.com/CrealikaCom/desktop-images/releases/download/v0.1.0/images-0.1.0.tar.gz",
+        "sha256": "1e46a7f02ead9c71ffd916326d2c043510c6109f2dcee65f81240d1cb6a83b1b"
+      }
+    }
+  ]
 }
