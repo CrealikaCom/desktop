@@ -1,12 +1,14 @@
 // Catalog of available services: what can be installed and from where.
-// The built-in catalog is extended by the user's one (<home>/config/catalog.json):
-// an entry with the same id replaces the built-in one, e.g. to install from a local checkout.
+// The built-in catalog, which comes with the app and lists the released services, is extended by
+// the user's one (<home>/config/catalog.json): an entry with the same id replaces the built-in
+// one, e.g. to install from a local checkout.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ID_RE } from './manifest.js';
 
 const SHA256_RE = /^[0-9a-f]{64}$/;
 const REF_RE = /^[A-Za-z0-9._\/-]{1,200}$/;
+const VERSION_RE = /^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$/;
 
 export async function loadCatalog(file) {
   const raw = JSON.parse(await fs.readFile(file, 'utf8'));
@@ -17,10 +19,13 @@ export async function loadCatalog(file) {
     if (!ID_RE.test(s.id ?? '')) throw new Error(`${file}: invalid id ${JSON.stringify(s.id)}`);
     if (seen.has(s.id)) throw new Error(`${file}: duplicate id ${s.id}`);
     seen.add(s.id);
+    if (s.version !== undefined && !VERSION_RE.test(String(s.version))) throw new Error(`${file}: ${s.id}: invalid version ${JSON.stringify(s.version)}`);
     return {
       id: s.id,
       name: typeof s.name === 'string' && s.name ? s.name : s.id,
       description: typeof s.description === 'string' ? s.description : '',
+      // The version the source holds: a release archive is pinned to one, a checkout is not.
+      version: s.version ?? null,
       source: parseSource(s.source, base, `${file}: ${s.id}`),
       origin: file,
     };

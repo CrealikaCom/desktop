@@ -63,6 +63,17 @@ test('catalog rejects an unsafe ref and an archive without sha256', async () => 
   await assert.rejects(loadCatalogs([f]), /ref/);
   await fs.writeFile(f, JSON.stringify({ services: [{ id: 'x1', source: { type: 'archive', url: 'https://x/a.tgz' } }] }));
   await assert.rejects(loadCatalogs([f]), /sha256/);
+  await fs.writeFile(f, JSON.stringify({ services: [{ id: 'x1', version: '../1', source: { type: 'dir', path: '.' } }] }));
+  await assert.rejects(loadCatalogs([f]), /version/);
+});
+
+test('built-in catalog: released services from GitHub archives, pinned to a version', async () => {
+  const builtin = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'catalog.json');
+  for (const e of await loadCatalogs([builtin])) {
+    assert.equal(e.source.type, 'archive', e.id);
+    assert.ok(e.version, `${e.id}: version`);
+    assert.match(e.source.url, new RegExp(`^https://github\\.com/CrealikaCom/desktop-${e.id}/releases/download/v${e.version}/${e.id}-${e.version}\\.tar\\.gz$`));
+  }
 });
 
 test('install from a folder, reinstall and uninstall', async () => {
@@ -99,6 +110,9 @@ test('install from an archive verified by sha256', async () => {
   const url = new URL(`file://${tgz.replaceAll('\\', '/')}`).href;
   await assert.rejects(install(entry({ type: 'archive', url, sha256: '0'.repeat(64) }), lay), /sha256/);
   assert.equal((await install(entry({ type: 'archive', url, sha256 }), lay)).id, 'echo');
+  // A release archive is pinned to a version: another one inside is an error, the installed one stays.
+  await assert.rejects(install({ ...entry({ type: 'archive', url, sha256 }), version: '2.0.0' }, lay), /1\.0\.0, the catalog says 2\.0\.0/);
+  assert.equal((await install({ ...entry({ type: 'archive', url, sha256 }), version: '1.0.0' }, lay)).version, '1.0.0');
 });
 
 test('run: environment, host API token, log and stop', async () => {

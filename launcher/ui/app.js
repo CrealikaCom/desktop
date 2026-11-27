@@ -70,7 +70,7 @@ function launcherSwitcher(services) {
 const engineName = (id) => state?.engines.find((e) => e.id === id)?.name ?? id;
 
 function serviceCard(s) {
-  let status = 'Not installed';
+  let status = s.version ? `Not installed · ${s.version}` : 'Not installed';
   if (s.busy) status = 'Please wait…';
   else if (s.installed?.broken) status = `Broken: ${s.installed.broken}`;
   else if (s.installed) status = `Installed ${s.installed.version}${s.running ? ' · running' : ''}`;

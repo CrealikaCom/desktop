@@ -76,6 +76,7 @@ export function runLauncher() {
           name: m?.name ?? c?.name ?? id,
           description: m?.description || c?.description || '',
           source: c ? describeSource(c.source) : null,
+          version: c?.version ?? null,
           installed: m ? (m.broken ? { broken: m.broken } : { version: m.version }) : null,
           running: running.has(id),
           busy: busy.has(id),

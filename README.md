@@ -43,15 +43,20 @@ npm start -- --show=<id>      # the launcher with that service's card highlighte
 npm run dist  # installers for this system in dist/ (electron-builder)
 ```
 
-The built-in service catalog is empty for now. To install a service from your own checkout,
-create `<home>/config/catalog.json`:
+The built-in service catalog (`catalog.json`) lists the released services: each entry pins a
+release archive on GitHub by version and sha256, and a new launcher version brings the new
+entries. `<home>/config/catalog.json` adds services and replaces built-in entries with the same
+id, for example to install a service from your own checkout:
 
 ```json
 { "services": [ { "id": "dummy", "source": { "type": "dir", "path": "/path/to/crealika-desktop-dummy" } } ] }
 ```
 
 A source can also be a git repository (`{"type": "git", "url": "…", "ref": "main"}`) or a
-`.tar.gz` archive (`{"type": "archive", "url": "…", "sha256": "…"}`).
+`.tar.gz` archive (`{"type": "archive", "url": "…", "sha256": "…"}`). An entry may carry the
+`version` its source holds; installing then checks the manifest against it. A service release
+publishes its catalog entry as `catalog-entry.json` (see the release workflow of the
+[desktop-dummy](https://github.com/CrealikaCom/desktop-dummy) template).
 
 Debugging: `npm start -- --remote-debugging-port=9333`. Services started from such a launcher
 inherit its open debugging socket, so the port stays taken while they run.
@@ -205,7 +210,7 @@ build/icon.png     app icon for the installers
 test/              node --test; fixtures/echo is a test service, fixtures/engine a fake engine
 ```
 
-A sample service lives in the `crealika-desktop-dummy` repository.
+A sample service and template for new services: [desktop-dummy](https://github.com/CrealikaCom/desktop-dummy).
 
 ## License
 

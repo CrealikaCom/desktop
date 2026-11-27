@@ -31,6 +31,9 @@ export async function install(entry, lay, { fetchImpl = fetch } = {}) {
     }
     const manifest = await readManifest(pkg);
     if (manifest.id !== entry.id) throw new Error(`the package contains service ${manifest.id}, expected ${entry.id}`);
+    if (entry.version && manifest.version !== entry.version) {
+      throw new Error(`the package contains ${entry.id} ${manifest.version}, the catalog says ${entry.version}`);
+    }
     await replaceDir(pkg, path.join(lay.services, entry.id));
     return manifest;
   } finally {
