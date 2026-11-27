@@ -1,7 +1,9 @@
 // Catalog of available services: what can be installed and from where.
-// The built-in catalog, which comes with the app and lists the released services, is extended by
-// the user's one (<home>/config/catalog.json): an entry with the same id replaces the built-in
-// one, e.g. to install from a local checkout.
+// Release catalogs list the released services: the built-in one, which comes with the app, and the
+// fresh one read from GitHub (remote-catalog.js). Their entries are release archives pinned to a
+// version, and of two entries for one service the newer version wins. The user's catalog
+// (<home>/config/catalog.json) comes last: an entry with the same id replaces the released one,
+// e.g. to install from a local checkout.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { ID_RE } from './manifest.js';
@@ -10,7 +12,12 @@ const SHA256_RE = /^[0-9a-f]{64}$/;
 const REF_RE = /^[A-Za-z0-9._\/-]{1,200}$/;
 const VERSION_RE = /^[0-9A-Za-z][0-9A-Za-z.+-]{0,63}$/;
 
-export async function loadCatalog(file) {
+// The only archives a release catalog may point to: a GitHub release of the service's repository.
+export function releaseArchiveUrl(id, version) {
+  return `https://github.com/CrealikaCom/desktop-${id}/releases/download/v${version}/${id}-${version}.tar.gz`;
+}
+
+export async function loadCatalog(file, { release = false } = {}) {
   const raw = JSON.parse(await fs.readFile(file, 'utf8'));
   if (!Array.isArray(raw.services)) throw new Error(`${file}: missing services list`);
   const base = path.dirname(file);
@@ -29,23 +36,52 @@ export async function loadCatalog(file) {
       source: parseSource(s.source, base, `${file}: ${s.id}`),
       origin: file,
     };
+  }).map((e) => {
+    if (release && (!e.version || e.source.type !== 'archive' || e.source.url !== releaseArchiveUrl(e.id, e.version))) {
+      throw new Error(`${file}: ${e.id}: a release catalog entry must be the release archive of its version`);
+    }
+    return { ...e, released: release };
   });
 }
 
-// Files in order; missing ones are skipped, later entries replace earlier ones by id.
+// Files in order: paths, or {path, release: true} for release catalogs. Missing files are skipped.
+// A later entry replaces an earlier one by id, except that between two release entries the newer
+// version stays.
 export async function loadCatalogs(files) {
   const byId = new Map();
-  for (const file of files) {
+  for (const item of files) {
+    const { path: file, release = false } = typeof item === 'string' ? { path: item } : item;
     let entries;
     try {
-      entries = await loadCatalog(file);
+      entries = await loadCatalog(file, { release });
     } catch (err) {
       if (err.code === 'ENOENT') continue;
       throw err;
     }
-    for (const e of entries) byId.set(e.id, e);
+    for (const e of entries) {
+      const prev = byId.get(e.id);
+      if (e.released && prev?.released && compareVersions(prev.version, e.version) >= 0) continue;
+      byId.set(e.id, e);
+    }
   }
   return [...byId.values()];
+}
+
+// Compares x.y.z versions with an optional -pre-release, which comes before its release:
+// negative when a is older than b, 0 when equal, positive when newer. Other strings compare as text.
+export function compareVersions(a, b) {
+  const parse = (v) => /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(v);
+  const pa = parse(a);
+  const pb = parse(b);
+  if (!pa || !pb) return a === b ? 0 : a < b ? -1 : 1;
+  for (let i = 1; i <= 3; i++) {
+    const d = Number(pa[i]) - Number(pb[i]);
+    if (d) return Math.sign(d);
+  }
+  if (pa[4] === pb[4]) return 0;
+  if (!pa[4]) return 1;
+  if (!pb[4]) return -1;
+  return pa[4] < pb[4] ? -1 : 1;
 }
 
 function parseSource(src, base, where) {

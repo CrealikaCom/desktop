@@ -9,7 +9,8 @@ import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createLauncherApi } from '../launcher/core/api.js';
 import { parseServiceArg } from '../launcher/core/args.js';
-import { loadCatalogs } from '../launcher/core/catalog.js';
+import { compareVersions, loadCatalogs, releaseArchiveUrl } from '../launcher/core/catalog.js';
+import { refreshCatalog, remoteCatalogFile, remoteCatalogUrl } from '../launcher/core/remote-catalog.js';
 import { ensureHome, SUBDIRS } from '../launcher/core/home.js';
 import { install, listInstalled, uninstall } from '../launcher/core/installer.js';
 import { validateManifest } from '../launcher/core/manifest.js';
@@ -69,11 +70,58 @@ test('catalog rejects an unsafe ref and an archive without sha256', async () => 
 
 test('built-in catalog: released services from GitHub archives, pinned to a version', async () => {
   const builtin = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'catalog.json');
-  for (const e of await loadCatalogs([builtin])) {
-    assert.equal(e.source.type, 'archive', e.id);
-    assert.ok(e.version, `${e.id}: version`);
-    assert.match(e.source.url, new RegExp(`^https://github\\.com/CrealikaCom/desktop-${e.id}/releases/download/v${e.version}/${e.id}-${e.version}\\.tar\\.gz$`));
+  // Loading it as a release catalog checks every entry.
+  assert.ok((await loadCatalogs([{ path: builtin, release: true }])).length);
+});
+
+const released = (id, version, sha = 'a') => ({ id, version, source: { type: 'archive', url: releaseArchiveUrl(id, version), sha256: sha.repeat(64) } });
+
+test('release catalogs: the newer version of a service wins, the user catalog still replaces it', async () => {
+  const builtin = path.join(tmp, 'rel-builtin.json');
+  const remote = path.join(tmp, 'rel-remote.json');
+  const user = path.join(tmp, 'rel-user.json');
+  await fs.writeFile(builtin, JSON.stringify({ services: [released('images', '0.2.0'), released('notes', '1.0.0')] }));
+  await fs.writeFile(remote, JSON.stringify({ services: [released('images', '0.1.9'), released('notes', '1.1.0'), released('voice', '0.1.0')] }));
+  const files = [{ path: builtin, release: true }, { path: remote, release: true }, user];
+  const byId = async () => Object.fromEntries((await loadCatalogs(files)).map((e) => [e.id, e.version]));
+  assert.deepEqual(await byId(), { images: '0.2.0', notes: '1.1.0', voice: '0.1.0' });
+  await fs.writeFile(user, JSON.stringify({ services: [{ id: 'notes', source: { type: 'dir', path: '.' } }] }));
+  assert.deepEqual(await byId(), { images: '0.2.0', notes: null, voice: '0.1.0' });
+
+  // A release entry is the release archive of its own version and nothing else.
+  for (const bad of [
+    { ...released('images', '0.3.0'), version: undefined },
+    { ...released('images', '0.3.0'), version: '0.3.1' },
+    { id: 'images', version: '0.3.0', source: { type: 'archive', url: 'https://example.com/images-0.3.0.tar.gz', sha256: 'a'.repeat(64) } },
+    { id: 'images', version: '0.3.0', source: { type: 'git', url: 'https://github.com/CrealikaCom/desktop-images.git' } },
+  ]) {
+    await fs.writeFile(remote, JSON.stringify({ services: [bad] }));
+    await assert.rejects(loadCatalogs(files), /release/);
   }
+});
+
+test('versions compare by number, a pre-release before its release', () => {
+  assert.equal(compareVersions('0.1.10', '0.1.9'), 1);
+  assert.equal(compareVersions('1.0.0', '1.0.0'), 0);
+  assert.equal(compareVersions('1.0.0-beta.1', '1.0.0'), -1);
+  assert.equal(compareVersions('1.0.0-beta.2', '1.0.0-beta.1'), 1);
+  assert.equal(compareVersions('2.0.0', '10.0.0'), -1);
+});
+
+test('the fresh catalog is saved only when it checks out, and can be turned off', async () => {
+  const file = remoteCatalogFile(lay);
+  const serve = (status, body) => async () => new Response(body, { status });
+  const good = JSON.stringify({ services: [released('images', '0.2.0')] });
+  await refreshCatalog(lay, { url: 'https://example.com/catalog.json', fetchImpl: serve(200, good) });
+  assert.equal(await fs.readFile(file, 'utf8'), good);
+  await assert.rejects(refreshCatalog(lay, { url: 'https://example.com/catalog.json', fetchImpl: serve(404, '') }), /HTTP 404/);
+  await assert.rejects(refreshCatalog(lay, { url: 'https://example.com/catalog.json', fetchImpl: serve(200, '{"services":[{"id":"x1"}]}') }));
+  await assert.rejects(refreshCatalog(lay, { url: 'https://example.com/catalog.json', fetchImpl: serve(200, 'not json') }));
+  assert.equal(await fs.readFile(file, 'utf8'), good, 'a bad catalog keeps the saved one');
+  assert.deepEqual((await fs.readdir(lay.cache)).sort(), ['catalog.json']);
+  await fs.rm(file);
+  assert.equal(remoteCatalogUrl({}), 'https://raw.githubusercontent.com/CrealikaCom/desktop/main/catalog.json');
+  assert.equal(remoteCatalogUrl({ CREALIKA_DESKTOP_CATALOG_URL: 'off' }), null);
 });
 
 test('install from a folder, reinstall and uninstall', async () => {

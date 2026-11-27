@@ -74,11 +74,13 @@ function serviceCard(s) {
   if (s.busy) status = 'Please wait…';
   else if (s.installed?.broken) status = `Broken: ${s.installed.broken}`;
   else if (s.installed) status = `Installed ${s.installed.version}${s.running ? ' · running' : ''}`;
+  if (!s.busy && s.update) status += s.running ? ` · ${s.update} available, close it to update` : ` · ${s.update} available`;
   const actions = [];
   if (!s.busy) {
     if (s.installed && !s.installed.broken) actions.push(button('Open', () => api.open(s.id), { primary: true }));
     if (s.running) actions.push(button('Stop', () => api.stop(s.id)));
-    if (s.source) actions.push(button(s.installed ? 'Reinstall' : 'Install', () => api.install(s.id), { primary: !s.installed, disabled: s.running }));
+    if (s.update) actions.push(button('Update', () => api.install(s.id), { disabled: s.running }));
+    else if (s.source) actions.push(button(s.installed ? 'Reinstall' : 'Install', () => api.install(s.id), { primary: !s.installed, disabled: s.running }));
     if (s.installed) actions.push(button('Uninstall', () => api.uninstall(s.id), { disabled: s.running }));
   }
   const lit = highlight?.id === s.id && Date.now() < highlight.until;

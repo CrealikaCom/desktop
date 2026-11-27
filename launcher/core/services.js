@@ -4,13 +4,19 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { loadCatalogs } from './catalog.js';
+import { remoteCatalogFile } from './remote-catalog.js';
 import { listInstalled } from './installer.js';
 import { ID_RE } from './manifest.js';
 import { control, listRunning, readRun } from './registry.js';
 
-// The built-in catalog next to the app and the user's catalog in the home directory.
+// The release catalogs (built into the app, and the fresh one from GitHub saved in the cache) and
+// the user's catalog in the home directory.
 export function catalogFiles(lay, appRoot) {
-  return [path.join(appRoot, 'catalog.json'), path.join(lay.config, 'catalog.json')];
+  return [
+    { path: path.join(appRoot, 'catalog.json'), release: true },
+    { path: remoteCatalogFile(lay), release: true },
+    path.join(lay.config, 'catalog.json'),
+  ];
 }
 
 // Catalog entries and installed services, by name; broken installs are left out.

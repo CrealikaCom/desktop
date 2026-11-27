@@ -6,7 +6,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { app, BrowserWindow, ipcMain, nativeTheme, net, protocol, shell } from 'electron';
 import { createAppSession } from './app-session.js';
-import { loadCatalogs } from './core/catalog.js';
+import { compareVersions, loadCatalogs } from './core/catalog.js';
+import { refreshCatalog, remoteCatalogUrl } from './core/remote-catalog.js';
 import { buildsFor, currentPlatform, loadEngineCatalogs, recommendedBuild, detectAccelerators } from './core/engine-catalog.js';
 import { installEngine, uninstallEngine } from './core/engine-installer.js';
 import { listRunningEngines, reapEngines } from './core/engine-runner.js';
@@ -25,6 +26,7 @@ import { startUpdates } from './updates.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(here, '..');
 const POLL_MS = 2000;
+const CATALOG_REFRESH_MS = 6 * 60 * 60 * 1000;
 const UI_DIR = path.join(here, 'ui');
 const CORE_DIR = path.join(appRoot, 'vendor', 'crealika-ui-core');
 const TYPES = {
@@ -77,6 +79,8 @@ export function runLauncher() {
           description: m?.description || c?.description || '',
           source: c ? describeSource(c.source) : null,
           version: c?.version ?? null,
+          // A newer version in the catalog than the installed one: the card offers Update.
+          update: m && !m.broken && c?.version && compareVersions(c.version, m.version) > 0 ? c.version : null,
           installed: m ? (m.broken ? { broken: m.broken } : { version: m.version }) : null,
           running: running.has(id),
           busy: busy.has(id),
@@ -281,6 +285,13 @@ export function runLauncher() {
     }
   }
 
+  // The fresh catalog from GitHub: new services and versions without a launcher release.
+  function refreshRemoteCatalog() {
+    const url = remoteCatalogUrl();
+    if (!url) return;
+    refreshCatalog(lay, { url }).then(notify, (err) => console.error(`Catalog refresh failed: ${err.message}`));
+  }
+
   async function main() {
     lay = await ensureHome(resolveHome());
     auth = createAppSession(lay);
@@ -356,6 +367,9 @@ export function runLauncher() {
       notify();
     }, POLL_MS);
     mainWindow.on('closed', () => clearInterval(timer));
+    refreshRemoteCatalog();
+    const catalogTimer = setInterval(refreshRemoteCatalog, CATALOG_REFRESH_MS);
+    mainWindow.on('closed', () => clearInterval(catalogTimer));
     await mainWindow.loadURL('launcher://app/index.html');
     startUpdates({ servicesRunning: async () => (await listRunning(lay)).size > 0 });
   }

@@ -25,8 +25,8 @@ before(async () => {
   const appRoot = path.join(tmp, 'app');
   await fs.mkdir(appRoot);
   files = catalogFiles(lay, appRoot);
-  await fs.writeFile(files[0], JSON.stringify({ services: [] }));
-  await fs.writeFile(files[1], JSON.stringify({ services: [
+  await fs.writeFile(files[0].path, JSON.stringify({ services: [] }));
+  await fs.writeFile(files[2], JSON.stringify({ services: [
     { id: 'images', name: 'Images', description: 'Pictures', source: { type: 'git', url: 'ssh://git@example.com/images.git' } },
     { id: 'voice', name: 'Voice', source: { type: 'git', url: 'ssh://git@example.com/voice.git' } },
   ] }));

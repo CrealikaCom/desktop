@@ -43,10 +43,19 @@ npm start -- --show=<id>      # the launcher with that service's card highlighte
 npm run dist  # installers for this system in dist/ (electron-builder)
 ```
 
-The built-in service catalog (`catalog.json`) lists the released services: each entry pins a
-release archive on GitHub by version and sha256, and a new launcher version brings the new
-entries. `<home>/config/catalog.json` adds services and replaces built-in entries with the same
-id, for example to install a service from your own checkout:
+Release catalogs list the released services: each entry pins a release archive of the service's
+GitHub repository by version and sha256. One is built into the launcher (`catalog.json`); the fresh
+one is the same file on the `main` branch of this repository, read when the launcher starts and
+every 6 hours and kept in `<home>/cache/catalog.json`, so a new service or version arrives without
+a launcher release. For each service the newer version of the two wins.
+`CREALIKA_DESKTOP_CATALOG_URL` reads another catalog (a `file:` URL too); `off` turns it off.
+
+When the catalog has a newer version of an installed service, its card shows it and an
+**Update** button, which installs that version once the service is closed. A failed update keeps
+the installed version.
+
+`<home>/config/catalog.json` adds services and replaces released entries with the same id, for
+example to install a service from your own checkout:
 
 ```json
 { "services": [ { "id": "dummy", "source": { "type": "dir", "path": "/path/to/crealika-desktop-dummy" } } ] }
@@ -56,7 +65,8 @@ A source can also be a git repository (`{"type": "git", "url": "…", "ref": "ma
 `.tar.gz` archive (`{"type": "archive", "url": "…", "sha256": "…"}`). An entry may carry the
 `version` its source holds; installing then checks the manifest against it. A service release
 publishes its catalog entry as `catalog-entry.json` (see the release workflow of the
-[desktop-dummy](https://github.com/CrealikaCom/desktop-dummy) template).
+[desktop-dummy](https://github.com/CrealikaCom/desktop-dummy) template); adding it to
+`catalog.json` on `main` publishes that version.
 
 Debugging: `npm start -- --remote-debugging-port=9333`. Services started from such a launcher
 inherit its open debugging socket, so the port stays taken while they run.
@@ -204,7 +214,7 @@ launcher/
   core/            Electron-free, covered by tests (engine-*.js, engines.js: shared engines)
 vendor/
   crealika-ui-core/  copy of Crealika UI core (scripts/sync-ui-core.js)
-catalog.json       built-in service catalog
+catalog.json       built-in service catalog (released services)
 engines.json       built-in engine catalog (scripts/engine-builds.js)
 build/icon.png     app icon for the installers
 test/              node --test; fixtures/echo is a test service, fixtures/engine a fake engine
