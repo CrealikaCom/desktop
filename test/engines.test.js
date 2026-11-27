@@ -58,8 +58,12 @@ async function makeArchive(name, files) {
   return { url: pathToFileURL(file).href, sha256: sha(bytes), size: bytes.length };
 }
 
-// Runs the JavaScript "server" of the fake engine with Node.
-const launchNode = (exe, args, options) => spawn(process.execPath, [exe, ...args], options);
+// Runs the JavaScript "server" of the fake engine with Node. Node does not run an ES module file
+// named .exe, so on Windows the fixture runs in place of its installed copy.
+const launchNode = (exe, args, options) => {
+  assert.equal(path.basename(exe), SERVER_FILE);
+  return spawn(process.execPath, [process.platform === 'win32' ? FAKE_SERVER : exe, ...args], options);
+};
 
 async function installFake() {
   const archive = await makeArchive('fake', { [SERVER_FILE]: await fs.readFile(FAKE_SERVER) });
