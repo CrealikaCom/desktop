@@ -18,6 +18,8 @@ import { ensureHome } from '../launcher/core/home.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FAKE_SERVER = path.join(here, 'fixtures', 'engine', 'fake-server.mjs');
 const BUILTIN = path.join(here, '..', 'engines.json');
+// The installer looks for <server>.exe on Windows.
+const SERVER_FILE = process.platform === 'win32' ? 'fake-server.exe' : 'fake-server';
 let tmp, lay;
 
 before(async () => {
@@ -60,14 +62,14 @@ async function makeArchive(name, files) {
 const launchNode = (exe, args, options) => spawn(process.execPath, [exe, ...args], options);
 
 async function installFake() {
-  const archive = await makeArchive('fake', { 'fake-server': await fs.readFile(FAKE_SERVER) });
+  const archive = await makeArchive('fake', { [SERVER_FILE]: await fs.readFile(FAKE_SERVER) });
   const engine = engineDef([archive]);
   await installEngine(engine, engine.builds[0], lay);
   return engine;
 }
 
 async function installFakePerModel() {
-  const archive = await makeArchive('fake-model', { 'fake-server': await fs.readFile(FAKE_SERVER) });
+  const archive = await makeArchive('fake-model', { [SERVER_FILE]: await fs.readFile(FAKE_SERVER) });
   const engine = validateEngine({
     id: 'fakem',
     name: 'Fake per-model engine',
@@ -152,12 +154,12 @@ test('accelerator detection by platform', async () => {
 });
 
 test('install merges the archives of a build, records it and keeps the old one on a bad checksum', async () => {
-  const main = await makeArchive('main', { 'bin/fake-server': 'server', 'bin/lib.so': 'lib' });
+  const main = await makeArchive('main', { [`bin/${SERVER_FILE}`]: 'server', 'bin/lib.so': 'lib' });
   const extra = await makeArchive('extra', { 'bin/cudart.so': 'runtime' });
   const engine = engineDef([main, extra]);
   const progress = [];
   const marker = await installEngine(engine, engine.builds[0], lay, { onProgress: (p) => progress.push(p) });
-  assert.equal(marker.server, 'bin/fake-server');
+  assert.equal(marker.server, `bin/${SERVER_FILE}`);
   assert.equal(marker.accel, 'cpu');
   assert.equal(await fs.readFile(path.join(lay.engines, 'fake', 'bin', 'cudart.so'), 'utf8'), 'runtime');
   assert.deepEqual(progress.at(-1), { received: main.size + extra.size, total: main.size + extra.size });
@@ -170,7 +172,7 @@ test('install merges the archives of a build, records it and keeps the old one o
   assert.deepEqual((await fs.readdir(lay.cache)).filter((n) => n.startsWith('engine-')), []);
 
   const noServer = engineDef([extra], { version: 'v3' });
-  await assert.rejects(installEngine(noServer, noServer.builds[0], lay), /fake-server not found/);
+  await assert.rejects(installEngine(noServer, noServer.builds[0], lay), /fake-server(\.exe)? not found/);
   await uninstallEngine('fake', lay);
   assert.equal(await readInstalledEngine(lay, 'fake'), null);
 });
@@ -286,7 +288,7 @@ test('host engines: models for per-model engines, release by model or all at onc
   assert.equal(list.engines[0].perModel, true);
   await assert.rejects(host.acquire('svc', 'fakem'), (err) => err.code === 'model_required');
   // The host launches real processes here, so point the server at Node through a wrapper.
-  const wrapper = path.join(lay.engines, 'fakem', 'fake-server');
+  const wrapper = path.join(lay.engines, 'fakem', SERVER_FILE);
   if (process.platform === 'win32') return;
   await fs.writeFile(wrapper, `#!/bin/sh\nexec "${process.execPath}" "${FAKE_SERVER}" "$@"\n`);
   await fs.chmod(wrapper, 0o755);

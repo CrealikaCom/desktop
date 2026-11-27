@@ -124,7 +124,7 @@ export async function detectAccelerators({ platform = currentPlatform(), env = p
   }
   const libDirs = ['/usr/lib/x86_64-linux-gnu', '/usr/lib/aarch64-linux-gnu', '/usr/lib64', '/usr/lib', '/lib/x86_64-linux-gnu', '/lib64'];
   for (const dir of libDirs) {
-    if (await exists(path.join(dir, 'libvulkan.so.1'))) {
+    if (await exists(path.posix.join(dir, 'libvulkan.so.1'))) {
       out.vulkan = true;
       break;
     }
