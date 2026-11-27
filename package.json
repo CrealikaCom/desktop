@@ -4,19 +4,106 @@
   "license": "Apache-2.0",
   "private": true,
   "description": "Crealika Desktop: launcher for local Crealika services",
+  "homepage": "https://crealika.com",
+  "author": "Crealika",
+  "repository": "github:CrealikaCom/desktop",
   "type": "module",
   "main": "launcher/main.js",
+  "desktopName": "crealika-desktop.desktop",
   "scripts": {
     "start": "node scripts/run-electron.js",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "dist": "electron-builder --publish never"
   },
   "engines": {
     "node": ">=22.13"
   },
   "devDependencies": {
-    "electron": "44.5.0"
+    "electron": "44.5.0",
+    "electron-builder": "26.18.0"
   },
   "dependencies": {
+    "electron-updater": "6.8.11",
     "openid-client": "6.9.1"
+  },
+  "build": {
+    "appId": "com.crealika.desktop",
+    "productName": "Crealika Desktop",
+    "executableName": "crealika-desktop",
+    "artifactName": "Crealika-Desktop-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "launcher/**",
+      "vendor/**",
+      "catalog.json",
+      "engines.json",
+      "package.json",
+      "LICENSE",
+      "NOTICE",
+      "TRADEMARKS.md",
+      "!**/*.d.ts"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "CrealikaCom",
+        "repo": "desktop"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "artifactName": "Crealika-Desktop-Setup-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Graphics",
+      "maintainer": "Crealika",
+      "synopsis": "Launcher for local Crealika tools",
+      "syncDesktopName": true
+    },
+    "appImage": {
+      "artifactName": "Crealika-Desktop-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.graphics-design",
+      "identity": "-",
+      "hardenedRuntime": false
+    }
   }
 }

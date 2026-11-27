@@ -20,6 +20,7 @@ import { control, listRunning, readRun } from './core/registry.js';
 import { parseShowArg } from './core/args.js';
 import { catalogFiles as serviceCatalogFiles } from './core/services.js';
 import { startApp } from './start-app.js';
+import { startUpdates } from './updates.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(here, '..');
@@ -355,6 +356,7 @@ export function runLauncher() {
     }, POLL_MS);
     mainWindow.on('closed', () => clearInterval(timer));
     await mainWindow.loadURL('launcher://app/index.html');
+    startUpdates({ servicesRunning: async () => (await listRunning(lay)).size > 0 });
   }
 
   app.on('second-instance', showWindow);

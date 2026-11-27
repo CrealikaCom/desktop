@@ -59,6 +59,12 @@ export async function openService(lay, files, id, start) {
   return 'launcher';
 }
 
+// The executable that starts this app again. A packaged AppImage runs from a mount that goes away
+// when its first process exits, so other processes start from the AppImage file itself.
+export function selfCommand({ packaged, env = process.env, execPath = process.execPath }) {
+  return (packaged && env.APPIMAGE) || execPath;
+}
+
 // Starts the app detached from this process: it keeps running when this one exits.
 export function spawnApp({ command, args, home }) {
   const env = { ...process.env, CREALIKA_HOME: home };

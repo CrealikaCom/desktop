@@ -129,3 +129,23 @@ test('Linux windows run under XWayland when it is there, with ANGLE on Vulkan fo
   assert.deepEqual(linux({ env: { DISPLAY: ':0' } }), [], 'an X11 session needs nothing');
   assert.deepEqual(displayArgs({ platform: 'win32', env, argv }), []);
 });
+
+test('a packaged AppImage starts other processes from the AppImage file', async () => {
+  const { selfCommand } = await import('../launcher/core/services.js');
+  const env = { APPIMAGE: '/home/u/Crealika-Desktop-x86_64.AppImage' };
+  const execPath = '/tmp/.mount_Crea1/crealika-desktop';
+  assert.equal(selfCommand({ packaged: true, env, execPath }), env.APPIMAGE);
+  assert.equal(selfCommand({ packaged: false, env, execPath }), execPath, 'from source: the AppImage is some other app');
+  assert.equal(selfCommand({ packaged: true, env: {}, execPath }), execPath);
+});
+
+test('updates run in the Windows installer and the AppImage only', async () => {
+  const { updatesSupported } = await import('../launcher/core/updates.js');
+  const appimage = { APPIMAGE: '/home/u/Crealika-Desktop-x86_64.AppImage' };
+  assert.equal(updatesSupported({ packaged: true, platform: 'win32', env: {} }), true);
+  assert.equal(updatesSupported({ packaged: true, platform: 'linux', env: appimage }), true);
+  assert.equal(updatesSupported({ packaged: true, platform: 'linux', env: {} }), false, '.deb');
+  assert.equal(updatesSupported({ packaged: true, platform: 'darwin', env: {} }), false, 'not signed yet');
+  assert.equal(updatesSupported({ packaged: false, platform: 'win32', env: {} }), false);
+  assert.equal(updatesSupported({ packaged: true, platform: 'win32', env: { CREALIKA_DESKTOP_NO_UPDATES: '1' } }), false);
+});

@@ -5,8 +5,30 @@ Each service is a standalone app with its own window, so you can close the launc
 service keeps running. All services share one home directory, `~/Crealika`, for engines,
 models and results. You can work without signing in, using local models.
 
-Status: early prototype. The llama.cpp engine is available; installers and more engines
-(stable-diffusion.cpp, whisper.cpp) are planned.
+Status: early prototype. Shared engines: llama.cpp, stable-diffusion.cpp and whisper.cpp.
+
+## Installing
+
+Download the build for your system from
+[Releases](https://github.com/CrealikaCom/desktop/releases/latest):
+
+| System | File | Updates |
+|---|---|---|
+| Windows 10/11 x64 | `Crealika-Desktop-Setup-<version>-x64.exe` | automatic |
+| Linux x64 | `Crealika-Desktop-x86_64.AppImage` | automatic |
+| Linux x64 (Debian, Ubuntu) | `Crealika-Desktop-<version>-linux-amd64.deb` | install the new package |
+| macOS, Apple Silicon or Intel | `Crealika-Desktop-<version>-mac-arm64.dmg` / `-x64.dmg` | download the new version |
+
+The builds are not signed yet, so the system warns before the first start:
+
+- Windows: SmartScreen says "Windows protected your PC". Choose **More info**, then **Run anyway**.
+- macOS: the first start is blocked. Open **System Settings → Privacy & Security** and choose
+  **Open Anyway** next to Crealika Desktop.
+- Linux AppImage: make the file executable (`chmod +x Crealika-Desktop-x86_64.AppImage`) and run it.
+
+The launcher checks for a new version when it starts, downloads it in the background and
+installs it when you close the launcher. While services are running the update waits, since it
+replaces the program they run from. `CREALIKA_DESKTOP_NO_UPDATES=1` turns the check off.
 
 ## Running from source
 
@@ -18,6 +40,7 @@ npm test      # launcher core, no Electron and no network
 npm start     # the launcher; home directory is ~/Crealika or $CREALIKA_HOME
 npm start -- --service=<id>   # an installed service without the launcher
 npm start -- --show=<id>      # the launcher with that service's card highlighted
+npm run dist  # installers for this system in dist/ (electron-builder)
 ```
 
 The built-in service catalog is empty for now. To install a service from your own checkout,
@@ -150,6 +173,15 @@ available the launcher and the services run as X11 windows (with the NVIDIA driv
 ANGLE on Vulkan). `CREALIKA_DESKTOP_WAYLAND=1` keeps native Wayland; switching then cannot move
 the focus.
 
+## Building and releases
+
+`npm run dist` builds the installers for the current system into `dist/`: NSIS on Windows, an
+AppImage and a .deb on Linux, a .dmg for Apple Silicon and Intel on macOS. The GitHub Actions
+workflow `.github/workflows/release.yml` runs the tests and the builds on all three systems.
+Pushing a tag `v<version>` that matches `version` in `package.json` publishes a release with the
+installers and the files the update check reads (`latest*.yml`).
+
+## Layout
 
 ```
 launcher/
@@ -157,6 +189,7 @@ launcher/
   launcher-app.js  launcher window: catalog, install, start and stop services
   service-host.js  service process: backend, window, registry, control
   start-app.js     starts another detached process of this executable
+  updates.js       updates of the installed app from GitHub Releases
   app-session.js   Crealika ID session of this process, encrypted with safeStorage
   preload.cjs      launcher window bridge
   ui/              launcher window, served from launcher://app/
@@ -165,6 +198,7 @@ vendor/
   crealika-ui-core/  copy of Crealika UI core (scripts/sync-ui-core.js)
 catalog.json       built-in service catalog
 engines.json       built-in engine catalog (scripts/engine-builds.js)
+build/icon.png     app icon for the installers
 test/              node --test; fixtures/echo is a test service, fixtures/engine a fake engine
 ```
 
@@ -175,6 +209,6 @@ A sample service lives in the `crealika-desktop-dummy` repository.
 Apache License, Version 2.0: see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 `vendor/crealika-ui-core/` is a copy of Crealika UI core under the same license, with the Onest
-font under the SIL Open Font License. The Crealika name and the logo files in
-`vendor/crealika-ui-core/brand/` are not covered by the Apache License; see
+font under the SIL Open Font License. The Crealika name, the logo files in
+`vendor/crealika-ui-core/brand/` and the app icon `build/icon.png` are not covered by the Apache License; see
 [TRADEMARKS.md](TRADEMARKS.md). A fork replaces them.

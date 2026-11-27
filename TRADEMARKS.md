@@ -1,7 +1,7 @@
 # The Crealika name and logo
 
 The code in this repository is licensed under the Apache License, Version 2.0. That license
-does not cover the Crealika name, the Crealika logo or the other brand files in `vendor/crealika-ui-core/brand/`, which
+does not cover the Crealika name, the Crealika logo or the other brand files in `vendor/crealika-ui-core/brand/` and the app icon `build/icon.png`, which
 belong to Crealika. Section 6 of the Apache License says the same: it grants no permission to
 use the licensor's trade names or trademarks.
 
@@ -15,7 +15,7 @@ use the licensor's trade names or trademarks.
 ## You may not, without written permission from Crealika
 
 - Distribute a modified version or a fork under the Crealika name or with the Crealika logo.
-  Replace the files in `vendor/crealika-ui-core/brand/` and the product name first.
+  Replace the files in `vendor/crealika-ui-core/brand/`, the app icon `build/icon.png` and the product name first.
 - Use the name or the logo in a way that suggests your product is official, or is made or
   endorsed by Crealika.
 - Change the logo or use it as part of another logo.

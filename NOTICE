@@ -8,5 +8,5 @@ NOTICE and TRADEMARKS.md. It includes the Onest font, Copyright 2021 The Onest
 Project Authors, licensed under the SIL Open Font License, Version 1.1
 (see vendor/crealika-ui-core/fonts/OFL.txt).
 
-The Crealika name and the logo files in vendor/crealika-ui-core/brand/ are not
-licensed under the Apache License. See TRADEMARKS.md.
+The Crealika name, the logo files in vendor/crealika-ui-core/brand/ and the app
+icon build/icon.png are not licensed under the Apache License. See TRADEMARKS.md.
