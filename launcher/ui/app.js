@@ -34,11 +34,10 @@ function button(label, onClick, { primary = false, danger = false, disabled = fa
   return el('button', { type: 'button', className: `cr-button${kind}`, textContent: label, disabled, onclick: () => act(onClick) });
 }
 
-const header = mountAppHeader({
+const headerOptions = {
   locale: 'en',
   locales: ['en'],
   title: 'Desktop',
-  account: undefined,
   signIn: () => act(() => api.signIn()),
   onLogout: () => act(() => api.signOut()),
   preferences: {
@@ -50,7 +49,23 @@ const header = mountAppHeader({
       api.setPreferences(value).catch(showError);
     },
   },
-});
+};
+let header = mountAppHeader({ ...headerOptions, account: undefined });
+
+// The header switcher lists the installed services, like the switcher in service windows but
+// without the ones still to install (their cards are here). Choosing one opens it like its Open
+// button: focuses its window or starts it.
+function launcherSwitcher(services) {
+  const installed = services.filter((s) => s.installed && !s.installed.broken).sort((a, b) => a.name.localeCompare(b.name));
+  if (!installed.length) return undefined;
+  return {
+    current: 'desktop',
+    items: [
+      { id: 'desktop', name: 'Desktop', listed: false },
+      ...installed.map((s) => ({ id: s.id, name: s.name, onSelect: () => act(() => api.open(s.id)) })),
+    ],
+  };
+}
 
 const engineName = (id) => state?.engines.find((e) => e.id === id)?.name ?? id;
 
@@ -157,6 +172,7 @@ function renderNotice(st) {
 
 let shownTheme = null;
 let shownUser;
+let shownSwitcher = '[]';
 
 async function render() {
   state = await api.state();
@@ -166,9 +182,19 @@ async function render() {
   }
   const user = state.session.user;
   const key = user ? user.sub : null;
-  if (key !== shownUser) {
+  const account = user ? { username: user.username ?? user.sub } : null;
+  // The header takes its switcher when it is mounted, so a new set of installed services mounts
+  // it again.
+  const switcher = launcherSwitcher(state.services);
+  const switcherKey = JSON.stringify(switcher?.items.map((item) => [item.id, item.name]) ?? []);
+  if (switcherKey !== shownSwitcher) {
+    shownSwitcher = switcherKey;
     shownUser = key;
-    header.setAccount(user ? { username: user.username ?? user.sub } : null);
+    header.destroy();
+    header = mountAppHeader({ ...headerOptions, switcher, account });
+  } else if (key !== shownUser) {
+    shownUser = key;
+    header.setAccount(account);
   }
   renderNotice(state);
   $('home').textContent = state.home;

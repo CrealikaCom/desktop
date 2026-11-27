@@ -168,6 +168,9 @@ The host lists them and opens one the way the launcher's Open button does:
 | `GET /v1/services` | `{services: [{id, name, description, installed, running, current}]}`: the catalog and installed services, by name |
 | `POST /v1/services/<id>/open` | `{result}`: `focused` (it was running), `started`, or `launcher` (not installed: the launcher opens on its card); 404 `unknown_service` |
 
+The launcher's header has the same switcher with the installed services; services still to
+install are on its cards.
+
 On Linux under Wayland an app cannot bring another app's window to the front, so when XWayland is
 available the launcher and the services run as X11 windows (with the NVIDIA driver, drawn through
 ANGLE on Vulkan). `CREALIKA_DESKTOP_WAYLAND=1` keeps native Wayland; switching then cannot move
