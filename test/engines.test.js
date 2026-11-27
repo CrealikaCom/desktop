@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createLauncherApi } from '../launcher/core/api.js';
 import { buildsFor, detectAccelerators, loadEngineCatalogs, recommendedBuild, validateEngine } from '../launcher/core/engine-catalog.js';
 import { installEngine, readInstalledEngine, uninstallEngine } from '../launcher/core/engine-installer.js';
-import { acquireEngine, EngineError, isAlive, listRunningEngines, reapEngines, releaseEngine } from '../launcher/core/engine-runner.js';
+import { acquireEngine, EngineError, isAlive, listRunningEngines, reapEngines, releaseEngine, stopProcess } from '../launcher/core/engine-runner.js';
 import { createHostEngines } from '../launcher/core/engines.js';
 import { ensureHome } from '../launcher/core/home.js';
 
@@ -229,7 +229,10 @@ test('a crashed engine is started again on the next acquire', async () => {
   const holder = { pid: process.pid, service: 'alpha' };
   const first = await acquireEngine(lay, engine, holder, { launch: launchNode, readyTimeoutMs: 15000 });
   const { pid } = await (await fetch(new URL('/v1/models', first.url), { headers: { authorization: `Bearer ${first.apiKey}` } })).json();
-  process.kill(-pid, 'SIGKILL');
+  // A crash of the engine and its children: the process group on Linux and macOS, the process
+  // tree on Windows, which has no process groups.
+  if (process.platform === 'win32') await stopProcess(pid);
+  else process.kill(-pid, 'SIGKILL');
   await waitDead(pid);
   const second = await acquireEngine(lay, engine, holder, { launch: launchNode, readyTimeoutMs: 15000 });
   assert.notEqual(second.apiKey, first.apiKey);
@@ -265,7 +268,8 @@ test('a per-model engine runs one process per model file, with the key in a file
   assert.equal(rb.data[0].id, 'b.bin');
   assert.equal(ra.argv.includes(a1.apiKey), false, 'the key is not on the command line');
   const keyPath = ra.argv[ra.argv.indexOf('--api-key-file') + 1];
-  assert.equal((await fs.stat(keyPath)).mode & 0o777, 0o600);
+  // Windows has no POSIX modes; the key file stays in the user's own profile there.
+  if (process.platform !== 'win32') assert.equal((await fs.stat(keyPath)).mode & 0o777, 0o600);
 
   const running = (await listRunningEngines(lay)).get('fakem');
   assert.deepEqual(running.instances.map((i) => i.model).sort(), ['a.bin', 'sub/b.bin']);
