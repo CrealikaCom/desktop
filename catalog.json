@@ -10,6 +10,17 @@
         "url": "https://github.com/CrealikaCom/desktop-images/releases/download/v0.1.1/images-0.1.1.tar.gz",
         "sha256": "f2140b39a909d9d1a461708e15bf2b3cb7e1edbd5eaa8f11b13f6d5d651631da"
       }
+    },
+    {
+      "id": "voice",
+      "name": "Voice",
+      "description": "Read texts aloud and transcribe recordings on your computer.",
+      "version": "0.1.0",
+      "source": {
+        "type": "archive",
+        "url": "https://github.com/CrealikaCom/desktop-voice/releases/download/v0.1.0/voice-0.1.0.tar.gz",
+        "sha256": "1dcecf74689e283a2542fd2c6b634d9ba5066911354ea7e80637589129c5e3f0"
+      }
     }
   ]
 }
